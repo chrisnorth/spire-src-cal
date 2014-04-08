@@ -5,7 +5,7 @@ Source Calibration code and example scripts for SPIRE
 
 ***This respository is for development purposes only***
 
-For "official" releases of code and products, please see official SPIRE websites and documents, such as:
+For _official_ releases of code and products, please see official SPIRE websites and documents, such as:
  + [The SPIRE calibration Web](http://herschel.esac.esa.int/twiki/bin/view/Public/SpireCalibrationWeb)
  + [The SPIRE Handbook](http://herschel.esac.esa.int/Docs/SPIRE/spire_handbook.pdf)
  + [SPIRE Photometer Beam Analysis pages](http://herschel.esac.esa.int/twiki/bin/view/Public/SpirePhotometerBeamProfileAnalysis)
