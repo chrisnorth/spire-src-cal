@@ -262,14 +262,35 @@
 #   Chris North      03-04-2014  - reformatted functions to remove dependence on global variables
 #   Chris North      08-04-2014  - added global variables back in(!)
 #                                  provided support for "Simple" beam model
-#                                  added to test scripts
+#                                  added functionality to test scripts
+#                                  added import statements so module can be imported
 #
 #===============================================================================
+
+#Import modules
 import os
+import herschel
+from herschel.ia.numeric import Double1d,Float1d,Int1d
+from herschel.spire.ia.cal import SpireCalTask
+spireCal = SpireCalTask()
+from herschel.ia.numeric.toolbox.interp import LinearInterpolator,CubicSplineInterpolator
+from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
+from java.lang.Math import PI
+from java.lang import Double
+from herschel.share.unit import Constant
+from herschel.ia.gui.plot import *
+import java.awt.Color
+from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp
+FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
+EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
+MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
+MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
+
+
 #-------------------------------------------------------------------------------
 # Loading physical and math constants
-from herschel.share.unit import *
-scriptVersionString = "SpireHandbookBundle.py $Revision: 1.0 $"
+
+#scriptVersionString = "SpireHandbookBundle.py $Revision: 1.0 $"
 
 
 
@@ -305,7 +326,6 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     # if cal not defined, read from pool or jarFile
     # if cal is defined, don't read anything new. Just check and return cal
     #print cal,calTree,calPool,calFile,verbose
-    from herschel.spire.ia.cal import SpireCalContext
     
     #set global variables
     global spireCalPhot #Photometer Calibration Context (spireCal.getPhot())
@@ -322,22 +342,26 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
         except:
             if cal==None and calTree!=None:
                 #try to read from HSA with calTree
-                try:
-                    cal=spireCal(calTree=calTree)
-                except:
-                    if verbose: print 'unable to read from HSA'
+                cal=spireCal(calTree=calTree)
+                #try:
+                #    cal=spireCal(calTree=calTree)
+                #except:
+                #    if verbose: print 'unable to read from HSA'
             if cal==None and calPool!=None:
                 #try to read from local pool
-                try:
-                    cal=spireCal(pool=calPool)
-                except:
-                    if verbose: print 'unable to read from local pool'
+                print 'hello world'
+                cal=spireCal(pool=calPool)
+                #try:
+                #    cal=spireCal(pool=calPool)
+                #except:
+                #    if verbose: print 'unable to read from local pool'
             if cal==None and calFile!=None:
                 #try to read from jarFile
-                try:
-                    cal=spireCal(jarfile=calFile)
-                except:
-                    if verbose: print 'unable to read from jar file'
+                cal=spireCal(jarfile=calFile)
+                #try:
+                #    cal=spireCal(jarfile=calFile)
+                #except:
+                #    if verbose: print 'unable to read from jar file'
             assert cal!=None,\
                 'ERROR: Unable to read calibration context'
 
@@ -349,7 +373,6 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     try:
         spireBands
     except:
-        global spireBands
         spireBands=['PSW','PMW','PLW']
     
     return(spireCalPhot)
@@ -366,7 +389,7 @@ def getSpireFreq():
         deltaNu = 0.1e9        # 0.1 GHz
         nuMin   = 300.e9
         nuMax   = 1800.e9
-        nNu     = FIX((nuMax-nuMin)/deltaNu)
+        nNu     = FLOOR((nuMax-nuMin)/deltaNu)
         spireFreq    = Double1d(range(nNu)) * deltaNu + nuMin
         
     return(spireFreq)
@@ -459,7 +482,7 @@ def getSpireFilt(rsrfOnly=False):
         #indexes of freq in apEff
         spireFreq=getSpireFreq()
         nNu=len(spireFreq)
-        ixA = spireFreq.where((spireFreq>=MIN(spireApEffFreq)) & (spireFreq<=MAX(spireApEffFreq)))
+        ixA = spireFreq.where((spireFreq>=MAX(spireApEffFreq)) & (spireFreq<=MAX(spireApEffFreq)))
         # spire RSRF * ApEff
         spireFilt={}
         #interpolate to freq array and apply to RSRF
@@ -478,6 +501,74 @@ def getSpireFilt(rsrfOnly=False):
     else:
         #return spireFilt
         return(spireFilt)
+
+def calcBeamMonoArea(beamType=None,verbose=False):
+    #calculate monochromatic beam areas using full or simple beam treatment
+    #print '\nCalculating monochromatic beam areas...'
+
+    #define global variables
+    global arcsec2Sr #conversion from acrsec^2 to steradians
+    global beamMonoArea #monochromatic beam areas over spireFreq
+
+    try:
+        arcsec2Sr
+    except:
+        #define global variable arcsec2Sr
+        arcsec2Sr = (PI/(60.*60.*180))**2
+    
+    try:
+        beamMonoArea['PSW'][0]
+        docalc=False
+        #global variable already defined, so do nothing.
+    except:
+        #not defined, so need to recalculate
+        docalc=True
+        recalc=False
+    
+    #print docalc
+    #Check whether existing beamType matches specified
+    if not docalc:
+        if beamMonoArea['beamType']=='Simple' and beamType=='Full':
+            if (verbose):print 'Replacing Simple Beams with Full Beams'
+            recalc=True
+        elif beamMonoArea['beamType']=='Full' and beamType=='Simple':
+            if (verbose):print 'Replacing Full Beams with Simple Beams'
+            recalc=True
+        elif beamType==None:
+            if (verbose):print 'No beamType specified, so using existing %s beams'%beamMonoArea['beamType']
+            recalc=False
+        else:
+            if (verbose):print 'Using existing %s beams'%beamMonoArea['beamType']
+            recalc=False
+    if recalc or docalc:
+
+        #recalculate beam profiles
+        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
+        gamma = beamProfs.meta['gamma'].double
+        beamMonoArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+
+        if beamType=='Simple':
+            beamMonoArea['beamType']='Simple'
+            #use simple beam treatment
+            neptuneArea = {}
+            neptuneArea['PSW']=beamProfs.meta['beamNeptunePswSr'].double
+            neptuneArea['PMW']=beamProfs.meta['beamNeptunePmwSr'].double
+            neptuneArea['PLW']=beamProfs.meta['beamNeptunePlwSr'].double
+            for band in spireBands:
+                if (verbose):print 'Calculating monochromatic beam areas for %s band (Simple treatment)'%band
+                beamMonoArea[band]=neptuneArea[band] * (getSpireFreq()/getSpireEffFreq()[band])**(2.*gamma)
+
+    
+        else:
+            #use full beam treatment
+            beamMonoArea['beamType']='Full'
+            for band in spireBands:
+                if (verbose):print 'Calculating monochromatic beam areas for %s band (Full treatment)'%band
+                #monochromatic beam areas
+                beamMonoArea[band] = spireMonoAreas(getSpireFreq(), beamProfs, 
+                  getSpireEffFreq()[band], gamma, band)
+
+    return beamMonoArea
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -543,8 +634,8 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
     # Integrate monochromatic area over frequency, weighted by rsrf and fSky
     numInterp=LinearInterpolator(freq,transm * fSky * monoArea)
     denomInterp=LinearInterpolator(freq,transm * fSky)
-    minFreq=min(freq)
-    maxFreq=max(freq)
+    minFreq=MIN(freq)
+    maxFreq=MAX(freq)
     integrator=TrapezoidalIntegrator(minFreq,maxFreq)
     numInteg=integrator.integrate(numInterp)
     denomInteg=integrator.integrate(denomInterp)
@@ -593,7 +684,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 
     #calculate the "scaled" radius, as nu^-gamma
     radNew=beamRad*(freqx/effFreq)**-gamma
-    maxRad=max(beamRad)
+    maxRad=MAX(beamRad)
     nRad=len(beamRad)
     #ensure it doesn't go out of range
     radNew[radNew.where(radNew > maxRad)]=maxRad
@@ -608,7 +699,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 
     #integrate to get solid angle (in arcsec^2)
     
-    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * Math.PI * beamRad)
+    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
     integrator=TrapezoidalIntegrator(0,maxRad)
     beamMonoArea=integrator.integrate(beamInterp)
 
@@ -651,7 +742,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
     """
 
-    arcsec2Sr = (Math.PI/(60.*60.*180))**2
+    arcsec2Sr = (PI/(60.*60.*180))**2
 
     #set up a sparser range of frequencies (otherwise it takes too long)
     nNu=len(freq)
@@ -793,8 +884,8 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
     # integrate over frequency
     numInterp=LinearInterpolator(freq,transm)
     denomInterp=LinearInterpolator(freq,transm * fSky * area)
-    minFreq=min(freq)
-    maxFreq=max(freq)
+    minFreq=MIN(freq)
+    maxFreq=MAX(freq)
 
     integrator=TrapezoidalIntegrator(minFreq,maxFreq)
     numInteg = integrator.integrate(numInterp)
@@ -808,76 +899,9 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 
 #-------------------------------------------------------------------------------
 #===============================================================================
-#=====                  CALCULATE MONOCHROMATIC BEAM AREAS                 =====
+#=====                    CALCULATE EFFECTIVE BEAM AREAS                   =====
 #===============================================================================
 #-------------------------------------------------------------------------------
-
-def calcBeamMonoArea(beamType=None,verbose=False):
-    #calculate monochromatic beam areas using full or simple beam treatment
-    #print '\nCalculating monochromatic beam areas...'
-
-    #define global variables
-    global arcsec2Sr #conversion from acrsec^2 to steradians
-    global beamMonoArea #monochromatic beam areas over spireFreq
-
-    try:
-        arcsec2Sr
-    except:
-        #define global variable arcsec2Sr
-        arcsec2Sr = (Math.PI/(60.*60.*180))**2
-    
-    try:
-        beamMonoArea
-        #global variable already defined, so do nothing.
-        docalc=False
-    except:
-        #not defined, so need to recalculate
-        docalc=True
-
-    #Check whether existing beamType matches specified
-    if not docalc:
-        if(verbose):print beamType
-        if beamMonoArea['beamType']=='Simple' and beamType=='Full':
-            if (verbose):print 'Replacing Simple Beams with Full Beams'
-            recalc=True
-        elif beamMonoArea['beamType']=='Full' and beamType=='Simple':
-            if (verbose):print 'Replacing Full Beams with Simple Beams'
-            recalc=True
-        elif beamType==None:
-            if (verbose):print 'No beamType specified, so using existing %s beams'%beamMonoArea['beamType']
-            recalc=False
-        else:
-            if (verbose):print 'Using existing %s beams'%beamMonoArea['beamType']
-            recalc=False
-    if recalc or docalc:
-
-        #recalculate beam profiles
-        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
-        gamma = beamProfs.meta['gamma'].double
-        beamMonoArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-
-        if beamType=='Simple':
-            beamMonoArea['beamType']='Simple'
-            #use simple beam treatment
-            neptuneArea = {}
-            neptuneArea['PSW']=beamProfs.meta['beamNeptunePswSr'].double
-            neptuneArea['PMW']=beamProfs.meta['beamNeptunePmwSr'].double
-            neptuneArea['PLW']=beamProfs.meta['beamNeptunePlwSr'].double
-            for band in spireBands:
-                if (verbose):print 'Calculating monochromatic beam areas for %s band (Simple treatment)'%band
-                beamMonoArea[band]=neptuneArea[band] * (getSpireFreq()/getSpireEffFreq()[band])**(2.*gamma)
-
-    
-        else:
-            #use full beam treatment
-            beamMonoArea['beamType']='Full'
-            for band in spireBands:
-                if (verbose):print 'Calculating monochromatic beam areas for %s band (Full treatment)'%band
-                #monochromatic beam areas
-                beamMonoArea[band] = spireMonoAreas(getSpireFreq(), beamProfs, 
-                  getSpireEffFreq()[band], gamma, band)
-
-    return beamMonoArea
 
 def calcOmegaEff(alphaK,verbose=False):
     # calculate effective beam area for power law spectrum
