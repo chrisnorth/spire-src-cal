@@ -18,7 +18,7 @@
 #
 #===============================================================================
 # 
-#  Herschel-SPIRE Colour Correction factors 
+#  Herschel-SPIRE Colour Correction factor calculations
 # 
 #  This routine calculates colour correction tables to convert from the standard
 #  pipeline flux densities (which are quoted for a nu*F_nu=const. spectrum) into 
@@ -48,6 +48,17 @@
 #  This module provides functions to calcualte the colour corrections for a
 #  range of source spectra, and for both point sources and extended sources
 # 
+#  The following global variables are defined and used:
+#         spireCalPhot: [context] Spire Calibration Context for Photometer
+#         spireBands:   [string list] SPIRE band names ["PSW","PMW","PLW"]
+#         spireFreq:    [float array] frequency raster across all bands
+#         spireRefFreq: [dict] SPIRE reference frequencies (1 scalar per band)
+#         spireEffFreq: [dict] SPIRE effective frequencies (1 scalar per band)
+#         spireFiltOnly:[dict] filter profile without aperture efficiency (1 array per band)
+#         spireFilt:    [dict] filter profile with aperture efficiency (1 array per band)
+#         beamMonoArea: [dict] SPIRE monochromatic areas (1 array per bands, plus 'beamType')
+#         arcsec2Sr:    [float] conversion fron square arcseconds to steradians
+#
 #  The functions are as follows:
 #  * getCal:
 #     Gets calibration Context from pool or file, and/or checks existing cal
@@ -56,9 +67,10 @@
 #         calTree: [string] Name of calibration tree to read from HSA (optional)
 #         calPool: [string] Name of calibration pool (optional)
 #         calFile: [string] Name of calibration file (optional)
+#         verbose: [boolean] Set to print more information to terminal
 #     - Outputs:
 #         cal:     [SpireCal context] Spire Calibration Context for Photometer
-#     - Global Variables
+#     - Global Variables used:
 #         spireCalPhot: [context] Spire Calibration Context for Photometer
 #         spireBands:   [string list] SPIRE band names ["PSW","PMW","PLW"]
 #
@@ -68,7 +80,7 @@
 #         NONE
 #     - Outputs:
 #         [float array] frequency raster across all bands
-#     - Global variables:
+#     - Global variables used:
 #         spireFreq [float array] frequency raster across all bands
 #
 #  * getSpireRefFreq:
@@ -76,7 +88,7 @@
 #         NONE
 #     - Outputs:
 #         [float dict] SPIRE reference frequencies (at 250,350,500 um)
-#     - Global variables:
+#     - Global variables used:
 #         spireRefFreq [dict] SPIRE reference frequencies (1 scalar per band)
 #
 #  * getSpireFilt:
@@ -95,24 +107,27 @@
 #         NONE
 #     - Outputs:
 #         [dict] SPIRE effective frequencies for three bands (1 scalar per band)
-#     - Global Variables:
+#     - Global Variables used:
 #         spireEffFreq: [dict] SPIRE effective frequencies (1 scalar per band)
 #
 #   * calcBeamMonoArea:
 #      Calulates monochromatic beam areas (used for many functions).
 #      Calculated for frequencies produced by getFreq
 #      - Inputs:
-#          NONE
+#          beamType: [string] beam type ('Full'|'Simple') to calculate. Default=None
+#              If not specified, existing beamType is used
+#          verbose:  [boolean] Set to print more information to terminal
 #      - Outputs:
-#          [dict] SPIRE monochromatic areas (1 array per band)
-#      - Global variables:
-#          beamMonoArea [dict] SPIRE monochromatic areas (1 array per bands)
+#          [dict] SPIRE monochromatic areas (1 array per band + beamType)
+#      - Global variables used:
+#          beamMonoArea [dict] SPIRE monochromatic areas (1 array per band + beamType)
 #          arcsec2Sr: [float] conversion fron square arcseconds to steradians
 #
 #   * calcOmegaEff:
 #      Calculates effective beam area for power law spectrum.
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] SPIRE effective beam areas
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
@@ -122,6 +137,7 @@
 #      - Inputs:
 #          betaK: [float] modBB emissivity index
 #          tempK: [float/list)] modBB temperature (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] SPIRE effective beam areas
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
@@ -130,6 +146,7 @@
 #      Calculates beam correction factor for power law spectrum
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] beam correction factors
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar ber band)
@@ -139,6 +156,7 @@
 #      - Inputs:
 #          betaK: [float] modBB emissivity index
 #          tempK: [float/list] modBB temperature (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] beam correction factors
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
@@ -175,6 +193,7 @@
 #      Calculates KColP colour correction parameter for power law spectrum
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] KColP colour corrections
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
@@ -184,6 +203,7 @@
 #      - Inputs:
 #          betaK: [float] modified blackbody emissivity index
 #          tempK: [float/list] modified black body temperature (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] KColP colour correction for SPIRE bands
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
@@ -192,6 +212,7 @@
 #      Calculates KColE colour correction parameter power law spectrum
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] KColE colour correction for SPIRE bands
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
@@ -201,16 +222,35 @@
 #      - Inputs:
 #          betaK: [float] modified blackbody emissivity index
 #          tempK: [float/list] modified black body temperature (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
 #      - Outputs:
 #          [dict] KColE colour correction for SPIRE bands
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
 #  
-#  Other functions for dealing with the beam model are also included.
+#  Other functions for dealing with the full beam model and colour corrections are also included@
 #   * spireEffArea: Calculate effective RSRF-weighted beam area for a given spectrum (power law or modified black-body)
 #   * spireMonoBeam: Calculate monochromatic beam profile & area at a given freq
 #   * spireMonoAreas: Calculate monochromatic beam areas at range of frequencies
 #   * hpXcalKcorr: Calculate K-correction parameters for given spectrum (power law or modified black body)
 #
+#  Example test functions are provided:
+#   * spireColCorrTest
+#      Tests the above functions
+#      - Inputs:
+#          beamType: [string] beamType to use ('Full'|'Simple'). Default=Full.
+#      - Outputs:
+#          [dict] SPIRE monochromatic areas (1 array per band + beamType)
+#          [float array] values of alpha used
+#          [float array] calculated values of OmegaEff for alpha
+#          [float array] calculated values of KBeam for alpha
+#          [float array] calculated values of KColP for alpha
+#          [float array] calculated values of KColE for alpha
+#   * compFullSimple
+#      Tests the calculations for full and simple beams and plots results and comparisons
+#      - Inputs:
+#          NONE
+#      - Outputs:
+#          Plots
 #===============================================================================
 # 
 #  Edition History
@@ -220,6 +260,9 @@
 #   Chris North      18-02-2014  - updated to use full calculation instead of reading csv files
 #   Ivan Valtchanov  15-03-2014  - reformatted to functions and a script bundle to distribute with the handbook
 #   Chris North      03-04-2014  - reformatted functions to remove dependence on global variables
+#   Chris North      08-04-2014  - added global variables back in(!)
+#                                  provided support for "Simple" beam model
+#                                  added to test scripts
 #
 #===============================================================================
 import os
@@ -245,6 +288,12 @@ scriptVersionString = "SpireHandbookBundle.py $Revision: 1.0 $"
 ##set verbose to print more information during processing
 #verbose = True
 
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                       DEFINE GLOBAL VARIABLES                       =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -255,12 +304,17 @@ scriptVersionString = "SpireHandbookBundle.py $Revision: 1.0 $"
 def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     # if cal not defined, read from pool or jarFile
     # if cal is defined, don't read anything new. Just check and return cal
+    #print cal,calTree,calPool,calFile,verbose
+    from herschel.spire.ia.cal import SpireCalContext
+    
+    #set global variables
+    global spireCalPhot #Photometer Calibration Context (spireCal.getPhot())
+    global spireBands # list of SPIRE band names
 
     try:
         spireCalPhot
-        #already defined, so do nothing
+        #global variable already defined, so do nothing
     except:
-        global spireCalPhot
         #get spireCalTree
         try:
             #try getting from cal
@@ -284,9 +338,8 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
                     cal=spireCal(jarfile=calFile)
                 except:
                     if verbose: print 'unable to read from jar file'
-        
-            assert cal !=None,\
-                'Unable to read calibration context'
+            assert cal!=None,\
+                'ERROR: Unable to read calibration context'
 
             spireCalPhot=cal.getPhot()
         
@@ -303,30 +356,31 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     
 def getSpireFreq():
     # Frequency raster of common frequency grid spanning all three spire bands
+    #define global variable
+    global spireFreq #raster of frequencies used throughout functions
     try:
         spireFreq
-        #already defined, so do nothing
+        #global variable already defined, so do nothing
     except:
         #not defined, so recalculate
-        global spireFreq
         deltaNu = 0.1e9        # 0.1 GHz
         nuMin   = 300.e9
         nuMax   = 1800.e9
         nNu     = FIX((nuMax-nuMin)/deltaNu)
         spireFreq    = Double1d(range(nNu)) * deltaNu + nuMin
-    
-        global spireFreq
         
     return(spireFreq)
     
 def getSpireRefFreq():
-        
+
+    #define global variable
+    global spireRefFreq #spire reference frequencies (at 250, 350, 500 microns)
+
     try:
         spireRefFreq
-        #already defined, so do nothing
+        #global variable already defined, so do nothing
     except:
         #not defined, so recalculate
-        global spireRefFreq
         spireRefFreq = {}
         c = Constant.SPEED_OF_LIGHT.value
         spireRefWl = {"PSW":250.*1e-6, "PMW":350.*1.e-6, "PLW":500.*1.e-6}
@@ -336,11 +390,34 @@ def getSpireRefFreq():
      
     return(spireRefFreq)
 
+
+def getSpireEffFreq():
+    #get SPIRE Effective Frequencies from metadata
+
+    #define global variable
+    global spireEffFreq #spire Effective frequencies
+
+    try:
+        spireEffFreq
+        #global variable already exists, so do nothing
+    except:
+        #doesn't exist, so get from calFile
+        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
+        spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
+            "PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
+            "PLW":beamProfs.meta['freqEffPlw'].double*1.e9}
+    
+    return(spireEffFreq)
+
 def getSpireFilt(rsrfOnly=False):
     
+    #define global variables
+    global spireFiltOnly #spire filter profiles (without ap. eff.) over spireFreq
+    global spireFilt #spire filter profiles (with ap. eff.) over spireFreq
+
     try:
         spireFiltOnly
-        #spireFiltOnly defined, so don't recalculate
+        #global variable spireFiltOnly defined, so don't recalculate
     except:
         #spireFiltOnly not defined, so must calculate
 
@@ -359,7 +436,6 @@ def getSpireFilt(rsrfOnly=False):
         ixR = spireFreq.where((spireFreq>=MIN(spireRsrfFreq)) & (spireFreq<=MAX(spireRsrfFreq)))
         #
         # spire RSRF only
-        global spireFiltOnly
         spireFiltOnly={}
         #interpolate to freq array
     
@@ -373,7 +449,7 @@ def getSpireFilt(rsrfOnly=False):
 
     try:
         spireFilt
-        #spireFilt defined, so do nothing
+        #global variable spireFilt defined, so do nothing
     except:
         #spireFilt not defined, so must calculate
         #add in aperture efficiency
@@ -402,22 +478,6 @@ def getSpireFilt(rsrfOnly=False):
     else:
         #return spireFilt
         return(spireFilt)
-
-def getSpireEffFreq():
-    #get SPIRE Effective Frequencies from metadata
-
-    try:
-        spireEffFreq
-        #already exists, so do nothing
-    except:
-        #doesn't exist, so get from calFile
-        global spireEffFreq
-        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
-        spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
-            "PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
-            "PLW":beamProfs.meta['freqEffPlw'].double*1.e9}
-    
-    return(spireEffFreq)
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -752,28 +812,70 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-def calcBeamMonoArea(verbose=False):
+def calcBeamMonoArea(beamType=None,verbose=False):
     #calculate monochromatic beam areas using full or simple beam treatment
     #print '\nCalculating monochromatic beam areas...'
 
-    #see if it's there already
+    #define global variables
+    global arcsec2Sr #conversion from acrsec^2 to steradians
+    global beamMonoArea #monochromatic beam areas over spireFreq
+
     try:
-        #already defined, so do nothing.
+        arcsec2Sr
+    except:
+        #define global variable arcsec2Sr
+        arcsec2Sr = (Math.PI/(60.*60.*180))**2
+    
+    try:
         beamMonoArea
+        #global variable already defined, so do nothing.
+        docalc=False
     except:
         #not defined, so need to recalculate
-        global arcsec2Sr,beamMonoArea
-        arcsec2Sr = (Math.PI/(60.*60.*180))**2
-        
+        docalc=True
+
+    #Check whether existing beamType matches specified
+    if not docalc:
+        if(verbose):print beamType
+        if beamMonoArea['beamType']=='Simple' and beamType=='Full':
+            if (verbose):print 'Replacing Simple Beams with Full Beams'
+            recalc=True
+        elif beamMonoArea['beamType']=='Full' and beamType=='Simple':
+            if (verbose):print 'Replacing Full Beams with Simple Beams'
+            recalc=True
+        elif beamType==None:
+            if (verbose):print 'No beamType specified, so using existing %s beams'%beamMonoArea['beamType']
+            recalc=False
+        else:
+            if (verbose):print 'Using existing %s beams'%beamMonoArea['beamType']
+            recalc=False
+    if recalc or docalc:
+
+        #recalculate beam profiles
         beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
         gamma = beamProfs.meta['gamma'].double
         beamMonoArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+
+        if beamType=='Simple':
+            beamMonoArea['beamType']='Simple'
+            #use simple beam treatment
+            neptuneArea = {}
+            neptuneArea['PSW']=beamProfs.meta['beamNeptunePswSr'].double
+            neptuneArea['PMW']=beamProfs.meta['beamNeptunePmwSr'].double
+            neptuneArea['PLW']=beamProfs.meta['beamNeptunePlwSr'].double
+            for band in spireBands:
+                if (verbose):print 'Calculating monochromatic beam areas for %s band (Simple treatment)'%band
+                beamMonoArea[band]=neptuneArea[band] * (getSpireFreq()/getSpireEffFreq()[band])**(2.*gamma)
+
     
-        for band in spireBands:
-            if (verbose):print 'Calculating monochromatic beam areas for %s band'%band
-            #monochromatic beam areas
-            beamMonoArea[band] = spireMonoAreas(getSpireFreq(), beamProfs, 
-              getSpireEffFreq()[band], gamma, band)
+        else:
+            #use full beam treatment
+            beamMonoArea['beamType']='Full'
+            for band in spireBands:
+                if (verbose):print 'Calculating monochromatic beam areas for %s band (Full treatment)'%band
+                #monochromatic beam areas
+                beamMonoArea[band] = spireMonoAreas(getSpireFreq(), beamProfs, 
+                  getSpireEffFreq()[band], gamma, band)
 
     return beamMonoArea
 
@@ -1123,10 +1225,12 @@ def calcKColE_BB(betaK,tempK,verbose=False):
 #
 # test for some parameters
 #
-def test():
+def spireColCorrTest(beamType='Full'):
     
     calphot=getCal(calPool='spire_cal_12_2')
-    beamMonoArea=calcBeamMonoArea()
+    alphaArr=Float1d(range(-4,5)) #range of alphas to use.
+    print beamType
+    beamMonoArea=calcBeamMonoArea(beamType=beamType,verbose=True)
 
     print 'Testing pipeline parameters'
     print 'K4P=',calcK4P()
@@ -1134,27 +1238,98 @@ def test():
     print 'K4E=',calcK4E()
     print 'KPtoE=',calcKPtoE()
     print 'Omega(-1)=',calcOmegaEff(-1.0)
-
+    omegaNepPsw=calcOmegaEff(spireCalPhot.getProduct('RadialCorrBeam').meta['alphaNeptunePsw'].double)['PSW']
+    omegaNepPmw=calcOmegaEff(spireCalPhot.getProduct('RadialCorrBeam').meta['alphaNeptunePmw'].double)['PMW']
+    omegaNepPlw=calcOmegaEff(spireCalPhot.getProduct('RadialCorrBeam').meta['alphaNeptunePlw'].double)['PLW']
+    print 'Omega_Nep=',[omegaNepPsw,omegaNepPmw,omegaNepPlw]
     print '\nTesting calcOmegaEff'
     print 'OmegaEff(-2)=',calcOmegaEff(-2.0)
-    result = calcOmegaEff([-2.0,-3,-4])
+    omegaEff = calcOmegaEff(alphaArr)
     print 'OmegaEff_BB(1.75,20)=',calcOmegaEff_BB(1.75,20.0)
-    result = calcOmegaEff_BB(1.75,[20.0,30.,40.])
+    omegaEff_BB = calcOmegaEff_BB(1.75,[20.0,30.,40.])
 
     print '\nTesting calcKBeam'
     print 'KBeam(-2)=',calcKBeam(-2.0)
-    result = calcKBeam([-2.0,-3,-4])
+    KBeam = calcKBeam(alphaArr)
     print 'KBeam(1.75,20)=',calcKBeam_BB(1.75,20.0)
-    result = calcKBeam_BB(1.75,[20.0,30.,40.])
+    KBeam_BB = calcKBeam_BB(1.75,[20.0,30.,40.])
 
     print '\nTesting calcKColP'
     print 'KColP(-2)=',calcKColP(-2.0)
-    result = calcKColP([-2.0,-3,-4])
+    KColP = calcKColP(alphaArr)
     print 'KColP(1.75,20)=',calcKColP_BB(1.75,20.0)
-    result = calcKColP_BB(1.75,[20.0,30.,40.])
+    KColP_BB = calcKColP_BB(1.75,[20.0,30.,40.])
 
     print '\nTesting calcKColE'
     print 'KColE(-2)=',calcKColE(-2.0)
-    result = calcKColE([-2.0,-3,-4])
+    KColE = calcKColE(alphaArr)
     print 'KColE(1.75,20)=',calcKColE_BB(1.75,20.0)
-    result = calcKColE_BB(1.75,[20.0,30.,40.])
+    KColE_BB = calcKColE_BB(1.75,[20.0,30.,40.])
+    
+    return(beamMonoArea,alphaArr,omegaEff,KBeam,KColP,KColE)
+
+def compFullSimple():
+    #compare full vs single beam treatments:
+    beamMonoArea_F,alphaArr,omegaEff_F,KBeam_F,KColP_F,KColE_F=spireColCorrTest(beamType='Full')
+    beamMonoArea_S,alphaArr,omegaEff_S,KBeam_S,KColP_S,KColE_S=spireColCorrTest(beamType='Simple')
+    pB=PlotXY()
+    pOE=PlotXY()
+    pKB=PlotXY()
+    pKCE=PlotXY()
+
+    pBd=PlotXY()
+    pOEd=PlotXY()
+    pKBd=PlotXY()
+    pKCEd=PlotXY()
+
+    cols={'PSW':java.awt.Color.BLUE,\
+      'PMW':java.awt.Color.GREEN,\
+      'PLW':java.awt.Color.RED}
+    for band in spireBands:
+        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_F[band],name='Beam Area %s (full)'%band,\
+          color=cols[band]))
+        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band],name='Beam Area %s (simple)'%band,\
+          color=cols[band],line=Style.DASHED))
+        pBd.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band]/beamMonoArea_F[band]-1.,name='Beam Area %s (s-f)'%band,\
+          color=cols[band]))
+        
+        pOE.addLayer(LayerXY(alphaArr,omegaEff_F[band],name='OmegaEff %s (full)'%band,\
+          color=cols[band]))
+        pOE.addLayer(LayerXY(alphaArr,omegaEff_S[band],name='OmegaEff %s (simple)'%band,\
+          color=cols[band],line=Style.DASHED))
+        pOEd.addLayer(LayerXY(alphaArr,omegaEff_S[band]/omegaEff_F[band]-1.,name='OmegaEff %s (s-f)'%band,\
+          color=cols[band]))
+    
+        pKB.addLayer(LayerXY(alphaArr,KBeam_F[band],name='KBeam %s (full)'%band,\
+          color=cols[band]))
+        pKB.addLayer(LayerXY(alphaArr,KBeam_S[band],name='KBeam %s (simple)'%band,\
+          color=cols[band],line=Style.DASHED))
+        pKBd.addLayer(LayerXY(alphaArr,KBeam_S[band]/KBeam_F[band]-1.,name='KBeam %s (s-f)'%band,\
+          color=cols[band]))
+    
+        pKCE.addLayer(LayerXY(alphaArr,KColE_F[band],name='KColE %s (full)'%band,\
+          color=cols[band]))
+        pKCE.addLayer(LayerXY(alphaArr,KColE_S[band],name='KColE %s (simple)'%band,\
+          color=cols[band],line=Style.DASHED))
+        pKCEd.addLayer(LayerXY(alphaArr,KColE_S[band]/KColE_F[band]-1.,name='KColE %s (s-g)'%band,\
+          color=cols[band]))
+
+    pB.xaxis.titleText = 'Frequency (GHz)'
+    pB.yaxis.titleText = 'Beam Area (sr)'
+    pBd.xaxis.titleText = 'Frequency (GHz)'
+    pBd.yaxis.titleText = 'Beam Area rel. diff'
+    
+    pOE.xaxis.titleText = 'Spectra Index (alpha)'
+    pOE.yaxis.titleText = 'Effective Beam Area (sr)'
+    pOEd.xaxis.titleText = 'Spectra Index (alpha)'
+    pOEd.yaxis.titleText = 'Effective Beam Area rel. diff'
+    
+    pKB.xaxis.titleText = 'Spectra Index (alpha)'
+    pKB.yaxis.titleText = 'KBeam'
+    pKBd.xaxis.titleText = 'Spectra Index (alpha)'
+    pKBd.yaxis.titleText = 'KBeam rel. diff'
+
+    pKCE.xaxis.titleText = 'Spectra Index (alpha)'
+    pKCE.yaxis.titleText = 'KColE'
+    pKCEd.xaxis.titleText = 'Spectra Index (alpha)'
+    pKCEd.yaxis.titleText = 'KColE rel. diff'
