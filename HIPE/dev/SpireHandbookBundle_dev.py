@@ -128,9 +128,11 @@
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
 #          [dict] SPIRE effective beam areas
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcOmegaEff_BB
 #      Calculates effective beam area for modified blackbody spectrum.
@@ -138,18 +140,22 @@
 #          betaK: [float] modBB emissivity index
 #          tempK: [float/list)] modBB temperature (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
 #          [dict] SPIRE effective beam areas
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcKBeam
 #      Calculates beam correction factor for power law spectrum
 #      - Inputs:
 #          alphaK: [float/list] power law spectral index (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
 #          [dict] beam correction factors
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar ber band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcKBeam_BB
 #      Calculates beam correction factor for modified blackbody spectrum.
@@ -157,9 +163,11 @@
 #          betaK: [float] modBB emissivity index
 #          tempK: [float/list] modBB temperature (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
 #          [dict] beam correction factors
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcK4P
 #      Calculates K4P calibration parameter (point source flux density, alpha=-1)
@@ -192,40 +200,48 @@
 #   * calcKColP
 #      Calculates KColP colour correction parameter for power law spectrum
 #      - Inputs:
-#          alphaK: [float/list] power law spectral index (scalar or list)
+#          alphaK:  [float/list] power law spectral index (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
-#          [dict] KColP colour corrections
+#          [dict|TableDataset] KColP colour corrections
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcKColP_BB
 #      Calculates KColP colour correction parameter for modified blackbody spectrum
 #      - Inputs:
-#          betaK: [float] modified blackbody emissivity index
-#          tempK: [float/list] modified black body temperature (scalar or list)
+#          betaK:   [float] modified blackbody emissivity index
+#          tempK:   [float/list] modified black body temperature (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
-#          [dict] KColP colour correction for SPIRE bands
+#          [dict|TableDataset] KColP colour correction for SPIRE bands
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcKColE
 #      Calculates KColE colour correction parameter power law spectrum
 #      - Inputs:
-#          alphaK: [float/list] power law spectral index (scalar or list)
+#          alphaK:  [float/list] power law spectral index (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
-#          [dict] KColE colour correction for SPIRE bands
+#          [dict|TableDataset] KColE colour correction for SPIRE bands
 #              (if alphaK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #
 #   * calcKColE_BB
 #      Calculates KColE colour correction parameter for modified blackbody spectrum
 #      - Inputs:
-#          betaK: [float] modified blackbody emissivity index
-#          tempK: [float/list] modified black body temperature (scalar or list)
+#          betaK:   [float] modified blackbody emissivity index
+#          tempK:   [float/list] modified black body temperature (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
+#          table:   [boolean] Set to output TableDataset
 #      - Outputs:
-#          [dict] KColE colour correction for SPIRE bands
+#          [dict|TableDataset] KColE colour correction for SPIRE bands
 #              (if tempK is list, 1 list per band, otherwise 1 scalar per band)
+#              (if 'table' is set, outputs as TableDataset)
 #  
 #  Other functions for dealing with the full beam model and colour corrections are also included@
 #   * spireEffArea: Calculate effective RSRF-weighted beam area for a given spectrum (power law or modified black-body)
@@ -264,20 +280,25 @@
 #                                  provided support for "Simple" beam model
 #                                  added functionality to test scripts
 #                                  added import statements so module can be imported
+#   Chris North      11-04-2014  - added support for TableDataset output
 #
 #===============================================================================
-
-#Import modules
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                      IMPORT HIPE & JAVA MODULES                     =====
+#===============================================================================
+#-------------------------------------------------------------------------------
 import os
 import herschel
 from herschel.ia.numeric import Double1d,Float1d,Int1d
 from herschel.spire.ia.cal import SpireCalTask
+from herschel.ia.dataset import TableDataset,DoubleParameter,Column
 spireCal = SpireCalTask()
 from herschel.ia.numeric.toolbox.interp import LinearInterpolator,CubicSplineInterpolator
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from java.lang.Math import PI
 from java.lang import Double
-from herschel.share.unit import Constant
+from herschel.share.unit import Constant,Temperature,SolidAngle
 from herschel.ia.gui.plot import *
 import java.awt.Color
 from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp
@@ -336,6 +357,11 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
         #global variable already defined, so do nothing
     except:
         #get spireCalTree
+        if cal==None and calTree==None and calPool==None and calFile==None:
+            #no import provided. do default action
+            defaultPool='spire_cal_12_2'
+            print 'Reading from default pool: %s'%defaultPool
+            cal=spireCal(pool=defaultPool)
         try:
             #try getting from cal
             spireCalPhot=cal.getPhot()
@@ -349,7 +375,6 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
                 #    if verbose: print 'unable to read from HSA'
             if cal==None and calPool!=None:
                 #try to read from local pool
-                print 'hello world'
                 cal=spireCal(pool=calPool)
                 #try:
                 #    cal=spireCal(pool=calPool)
@@ -903,7 +928,7 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-def calcOmegaEff(alphaK,verbose=False):
+def calcOmegaEff(alphaK,verbose=False,table=False):
     # calculate effective beam area for power law spectrum
 
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -933,10 +958,20 @@ def calcOmegaEff(alphaK,verbose=False):
                   calcBeamMonoArea()[band], BB=False, alpha=alphaK[a])/arcsec2Sr
             if (verbose): print 'Calculated Omega_eff for alpha=%f: '%alphaK[a],beamArea["PSW"][a],beamArea["PMW"][a],beamArea["PLW"][a]
 
-    return beamArea
+    if not table:
+        #return as is
+        return beamArea
+    else:
+        #create and returnTableDataset
+        beamArea_table=TableDataset()
+        beamArea_table.setDescription("Beam Solid Angle (Spectral Index)")
+        beamArea_table.addColumn("alpha",Column(Double1d(alphaK)))
+        for band in spireBands:
+            beamArea_table.addColumn(band,Column(beamArea[band],unit=SolidAngle.STERADIANS,description=''))
+        return(beamArea_table)
 
 
-def calcOmegaEff_BB(betaK,tempK,verbose=False):
+def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
     # calculate effective beam area for modified BB spectrum
     # allows multiple temperatures, but only one beta value
 
@@ -952,26 +987,37 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False):
 
     if not tList:
         # tempK is scalars
-        beamArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        beamAreaBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         for band in spireBands:
             #pipeline beam areas
-            beamArea[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
+            beamAreaBB[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
               calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK)/arcsec2Sr
-        if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK),beamArea
+        if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK),beamAreaBB
 
     else:
         # tempK is a list
-        beamArea = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
+        beamAreaBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
             for band in spireBands:
                 #pipeline beam areas
-                beamArea[band][t]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
+                beamAreaBB[band][t]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
                   calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK[t])/arcsec2Sr
-            if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),beamArea["PSW"][t],beamArea["PMW"][t],beamArea["PLW"][t]
+            if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),beamAreaBB["PSW"][t],beamAreaBB["PMW"][t],beamAreaBB["PLW"][t]
 
-    return beamArea
+    if not table:
+        #return as is
+        return beamAreaBB
+    else:
+        #create and returnTableDataset
+        beamAreaBB_table=TableDataset()
+        beamAreaBB_table.setDescription("Beam Solid Angle (Modified Black Body, beta=%.2f)"%betaK)
+        beamAreaBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
+        beamAreaBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
+        for band in spireBands:
+            beamAreaBB_table.addColumn(band,Column(beamAreaBB[band],unit=SolidAngle.STERADIANS,description=''))
+        return(beamAreaBB_table)
        
-def calcKBeam(alphaK,verbose=False):
+def calcKBeam(alphaK,verbose=False,table=False):
     # Calculate pipeline colour correction parameters
     # cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     try:
@@ -1000,9 +1046,19 @@ def calcKBeam(alphaK,verbose=False):
                 kBeam[band][a] = beamAreaPip[band]/beamEff[band][a]
             if verbose: print 'Calculated KBeam for alpha=%f: '%alphaK[a],kBeam["PSW"][a],kBeam["PMW"][a],kBeam["PLW"][a]
 
-    return kBeam
+    if not table:
+        #return as is
+        return kBeam
+    else:
+        #create and returnTableDataset
+        kBeam_table=TableDataset()
+        kBeam_table.setDescription("Beam Colour Correction (Spectral Index)")
+        kBeam_table.addColumn("alpha",Column(Double1d(alphaK)))
+        for band in spireBands:
+            kBeam_table.addColumn(band,Column(kBeam[band]))
+        return kBeam_table
 #
-def calcKBeam_BB(betaK,tempK,verbose=False):
+def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
     # Calculate pipeline colour correction parameters
     # allows multiple temperatures, but only one beta value
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1015,23 +1071,34 @@ def calcKBeam_BB(betaK,tempK,verbose=False):
     beamAreaPip = calcOmegaEff(-1.0)
     if not tList:
         # tempK is scalar
-        kBeam = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        kBeamBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         beamEff = calcOmegaEff_BB(betaK,tempK)
         for band in spireBands:
             #pipeline beam areas
-            kBeam[band] = beamAreaPip[band]/beamEff[band]
-        if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK),kBeam
+            kBeamBB[band] = beamAreaPip[band]/beamEff[band]
+        if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK),kBeamBB
     else:
         # tempK is a list
-        kBeam = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
+        kBeamBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         beamEff = calcOmegaEff_BB(betaK,tempK)
         for t in range(nt):
             for band in spireBands:
                 #pipeline beam areas
-                kBeam[band][t] = beamAreaPip[band]/beamEff[band][t]
-            if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),kBeam["PSW"][t],kBeam["PMW"][t],kBeam["PLW"][t]
+                kBeamBB[band][t] = beamAreaPip[band]/beamEff[band][t]
+            if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),kBeamBB["PSW"][t],kBeamBB["PMW"][t],kBeamBB["PLW"][t]
 
-    return kBeam
+    if not table:
+        #return as is
+        return kBeamBB
+    else:
+        #create and returnTableDataset
+        kBeamBB_table=TableDataset()
+        kBeamBB_table.setDescription("Beam Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
+        kBeamBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
+        kBeamBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
+        for band in spireBands:
+            kBeamBB_table.addColumn(band,Column(kBeamBB[band]))
+        return(kBeamBB_table)
 
 #-----------------------------------------------------------------------
 #=======================================================================
@@ -1094,7 +1161,7 @@ def calcKPtoE():
 #=======================================================================
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
-def calcKColP(alphaK,verbose=False):
+def calcKColP(alphaK,verbose=False,table=False):
     #print '\nCalculating point source colour correction parameters for a given alpha...'
 
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1129,9 +1196,21 @@ def calcKColP(alphaK,verbose=False):
                 #point source colour correction for current alpha
                 kColP[band][a] = kConvPsrc/k4P[band]
             if (verbose): print 'Calculated KColP for alpha=%f: '%alphaK[a],kColP["PSW"][a],kColP["PMW"][a],kColP["PLW"][a]
-    return kColP
+            
+    if not table:
+        #return as is
+        return kColP
+    else:
+        #create and returnTableDataset
+        kColP_table=TableDataset()
+        kColP_table.setDescription("Point Source Colour Correction (Spectral Index)")
+        kColP_table.addColumn("alpha",Column(Double1d(alphaK)))
+        for band in spireBands:
+            kColP_table.addColumn(band,Column(kColP[band]))
+        return kColP_table
 
-def calcKColP_BB(betaK,tempK,verbose=False):
+
+def calcKColP_BB(betaK,tempK,verbose=False,table=False):
     #-----------------------------------------------------------------------
     #print 'Calculating point source colour correction parameters over beta & temp...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1163,8 +1242,19 @@ def calcKColP_BB(betaK,tempK,verbose=False):
                 #point source colour correction for current beta,temp
                 kColPBB[band][t] = kConvPsrc/k4P[band]
             if (verbose): print 'Calculated KColP for modBB with T=%f K, beta=%f: '%(tempK[t],betaK),kColPBB["PSW"][t],kColPBB["PMW"][t],kColPBB["PLW"][t]
-    return kColPBB
-
+    
+    if not table:
+        #return as is
+        return kColPBB
+    else:
+        #create and returnTableDataset
+        kColPBB_table=TableDataset()
+        kColPBB_table.setDescription("Point Source Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
+        kColPBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
+        kColPBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
+        for band in spireBands:
+            kColPBB_table.addColumn(band,Column(kColPBB[band]))
+        return(kColPBB_table)
 #-----------------------------------------------------------------------
 #=======================================================================
 #=====         CALCULATE EXTENDED SOURCE COLOR CORRECTIONS         =====
@@ -1172,7 +1262,7 @@ def calcKColP_BB(betaK,tempK,verbose=False):
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 
-def calcKColE(alphaK,verbose=False):
+def calcKColE(alphaK,verbose=False,table=False):
     #-----------------------------------------------------------------------
     #print '\nCalculating extended source colour correction parameters over alpha...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1207,11 +1297,21 @@ def calcKColE(alphaK,verbose=False):
                  ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
                 kColE[band][a] = k4EaTot_x / k4E_Tot[band]
             if (verbose): print 'Calculated KColE for alpha=%f: '%alphaK[a],kColE["PSW"][a],kColE["PMW"][a],kColE["PLW"][a]
-    return kColE
 
+    if not table:
+        #return as is
+        return kColE
+    else:
+        #create and returnTableDataset
+        kColE_table=TableDataset()
+        kColE_table.setDescription("Extended Source Colour Correction (Spectral Index)")
+        kColE_table.addColumn("alpha",Column(Double1d(alphaK)))
+        for band in spireBands:
+            kColE_table.addColumn(band,Column(kColE[band]))
+        return kColE_table
 #-----------------------------------------------------------------------
 
-def calcKColE_BB(betaK,tempK,verbose=False):
+def calcKColE_BB(betaK,tempK,verbose=False,table=False):
     #
     #print 'Calculating extended source colour correction parameters over beta & temp...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1244,8 +1344,19 @@ def calcKColE_BB(betaK,tempK,verbose=False):
                       ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
                 kColEBB[band][t] = k4EbTot_x / k4E_Tot[band]
             if (verbose): print 'Calculated KColE for modBB with T=%f K, beta=%f: '%(tempK[t],betaK),kColEBB["PSW"][t],kColEBB["PMW"][t],kColEBB["PLW"][t]
-    return kColEBB
 
+    if not table:
+        #return as is
+        return kColEBB
+    else:
+        #create and returnTableDataset
+        kColEBB_table=TableDataset()
+        kColEBB_table.setDescription("Extended Source Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
+        kColEBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
+        kColEBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
+        for band in spireBands:
+            kColEBB_table.addColumn(band,Column(kColEBB[band]))
+        return(kColEBB_table)
 #
 # test for some parameters
 #
