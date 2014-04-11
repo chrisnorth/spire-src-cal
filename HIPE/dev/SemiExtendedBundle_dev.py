@@ -71,7 +71,7 @@ spireCal = SpireCalTask()
 from herschel.ia.numeric.toolbox.interp import LinearInterpolator,CubicSplineInterpolator
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from java.lang.Math import PI
-from java.lang import Double
+from java.lang import Double,Float,String
 from herschel.share.unit import Constant
 from herschel.ia.gui.plot import *
 import java.awt.Color
@@ -233,31 +233,75 @@ def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-def src2key(srcType,params):
+#possible Source Types and number of parameters required    
+global srcTypesAll
+srcTypesAll={'GAUSSIAN':1,'LINEAR':1,'POWERLAW':2}
+
+def src2key(srcType,paramsIn):
     #generate key name for specific source type
-    if srcType=='Gaussian':
-        #Gaussian with width
-        assert len(params)==1,'%s source must have 1 params. %d provided'%(srcType,len(params))
-        key='Gauss_%.3f'%params[0]
-    else:
-        key='TYPE_UNKNOWN'
-    
-    assert key!='TYPE_UNKNOWN','Unknown source type: %s'%srcType
+
+    #take first 8 characters, and make uppercase
+    srcTypeU=srcType[:8].upper()
+    #check if parameter(s) are in a list, and if not, put them in a list
+    print paramsIn.__class__
+    try:
+        nParam=len(paramsIn)
+        params=Float1d(paramsIn)
+        print nParam
+    except:
+        params=Float1d([paramsIn])
+        #find number of parameters
+        nParam=len(params)
+        print '2',nParam
+
+    #check number of parameters against list
+    srcFound=False
+    for type in srcTypesAll:
+        if srcTypeU[:8].upper()==type[:8].upper():
+            srcFound=True
+            nParamReq=srcTypesAll[type]
+            assert nParam>=nParamReq,\
+              '%s source must have %d parameters. %d provided'%(srcType,nParamReq,nParam)
+            if nParam>nParamReq:
+                print 'WARNING: %d parameters provided for %s source. Using first %d'%(nParam,srcType,nParamReq)
+
+    #error if source not found
+    assert srcFound,'Unknown source type: %s'%srcType
+
+    #initialise key
+    key=srcTypeU
+    print paramsIn,params
+    for par in params:
+        print par
+        key='%s_%g'%(key,par)
     
     return(key)
 
+def key2src(key):
+    #generate source type from key name
+    keySplit=key.split('_')
+    srcType=keySplit[0].capitalize()
+    paramSplit=keySplit[1:]
+    params=[]
+    for par in paramSplit:
+        params.append(Float(par))
+    
+    return(srcType,params)
+    
 def calcBeamSrcMonoAreaGauss(srcWidth,verbose=False):
     #calculate monochromatic beam areas using full or simple beam treatment
     #print '\nCalculating monochromatic beam areas...'
 
-    key=src2key('Gaussian',[srcWidth])
     global arcsec2Sr
     global beamMonoSrcArea
+
     try:
         arcsec2Sr
     except:
         #define arcsec2Sr
         arcsec2Sr = (Math.PI/(60.*60.*180))**2
+
+    key=src2key('Gaussian',[srcWidth])
     
     try:
         beamMonoSrcArea[key]
@@ -286,9 +330,9 @@ def calcBeamSrcMonoAreaGauss(srcWidth,verbose=False):
             beamMonoSrcArea[key][band] = spireMonoSrcAreas(getSpireFreq(), beamProfs, 
               getSpireEffFreq()[band], gamma, srcProf, band)
 
-    return beamMonoSrcArea[key]
+    return beamMonoSrcArea[key],key
 
-def calcKColESrc(alphaK,beamMonoSrcArea,verbose=False):
+def calcKColESrc(alphaK,srcWidth,verbose=False):
     #-----------------------------------------------------------------------
     #print '\nCalculating extended source colour correction parameters over alpha...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -305,23 +349,33 @@ def calcKColESrc(alphaK,beamMonoSrcArea,verbose=False):
 
     if not aList:
         # alphaK is scalar
-        kColE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        kColESrc = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         #kBeamK = calcKBeam(alphaK)
         for band in spireBands:
             k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
              getSpireFilt()[band], BB=False, alpha=alphaK,\
-             ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
-            kColE[band] = k4EaTot_x / k4E_Tot[band]
-        if (verbose): print 'Calculated KColE for alpha=%f: '%alphaK,kColE
+             ext=True, monoArea=calcBeamSrcMonoArea(srcWidth)[band])[0]/1.e6
+            kColESrc[band] = k4EaTot_x / k4E_Tot[band]
+        if (verbose): print 'Calculated KColE for alpha=%f and source Width: '%alphaK,kColE
     else:
         # alphaK is list
-        kColE = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
+        kColESrc = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         for a in range(na):
             for band in spireBands:
                 k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                  getSpireFilt()[band], BB=False, alpha=alphaK[a],\
-                 ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
+                 ext=True, monoArea=calcBeamSrcMonoArea(srcWidth)[band])[0]/1.e6
                 kColE[band][a] = k4EaTot_x / k4E_Tot[band]
             if (verbose): print 'Calculated KColE for alpha=%f: '%alphaK[a],kColE["PSW"][a],kColE["PMW"][a],kColE["PLW"][a]
-    return kColE
 
+    if not table:
+        #return as is
+        return kColE
+    else:
+        #create and returnTableDataset
+        kColE_table=TableDataset()
+        kColE_table.setDescription("Extended Source Colour Correction (Spectral Index)")
+        kColE_table.addColumn("alpha",Column(Double1d(alphaK)))
+        for band in spireBands:
+            kColE_table.addColumn(band,Column(kColE[band]))
+        return kColE_table
