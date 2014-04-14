@@ -82,6 +82,7 @@ MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
 MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 
 from SpireHandbookBundle_dev import *
+import sources_dev as srcMod
 
 #scriptVersionString = "SemiExtendedBundle.py $Revision: 1.0 $"
 
@@ -148,7 +149,7 @@ def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,arr
     ## FULL PROFILE OF CONVOLUTION REQUIRES PROPER CONVOLUTION
 
     #integrate to get solid angle (in arcsec^2)    
-    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * Math.PI * beamRad)
+    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
     integrator=TrapezoidalIntegrator(0,maxRad)
     beamMonoArea=integrator.integrate(beamInterp)
 
@@ -194,7 +195,7 @@ def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
 
     """
 
-    arcsec2Sr = (Math.PI/(60.*60.*180))**2
+    arcsec2Sr = (PI/(60.*60.*180))**2
 
     #set up a sparser range of frequencies (otherwise it takes too long)
     nNu=len(freq)
@@ -233,62 +234,8 @@ def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-#possible Source Types and number of parameters required    
-global srcTypesAll
-srcTypesAll={'GAUSSIAN':1,'LINEAR':1,'POWERLAW':2}
 
-def src2key(srcType,paramsIn):
-    #generate key name for specific source type
-
-    #take first 8 characters, and make uppercase
-    srcTypeU=srcType[:8].upper()
-    #check if parameter(s) are in a list, and if not, put them in a list
-    print paramsIn.__class__
-    try:
-        nParam=len(paramsIn)
-        params=Float1d(paramsIn)
-        print nParam
-    except:
-        params=Float1d([paramsIn])
-        #find number of parameters
-        nParam=len(params)
-        print '2',nParam
-
-    #check number of parameters against list
-    srcFound=False
-    for type in srcTypesAll:
-        if srcTypeU[:8].upper()==type[:8].upper():
-            srcFound=True
-            nParamReq=srcTypesAll[type]
-            assert nParam>=nParamReq,\
-              '%s source must have %d parameters. %d provided'%(srcType,nParamReq,nParam)
-            if nParam>nParamReq:
-                print 'WARNING: %d parameters provided for %s source. Using first %d'%(nParam,srcType,nParamReq)
-
-    #error if source not found
-    assert srcFound,'Unknown source type: %s'%srcType
-
-    #initialise key
-    key=srcTypeU
-    print paramsIn,params
-    for par in params:
-        print par
-        key='%s_%g'%(key,par)
-    
-    return(key)
-
-def key2src(key):
-    #generate source type from key name
-    keySplit=key.split('_')
-    srcType=keySplit[0].capitalize()
-    paramSplit=keySplit[1:]
-    params=[]
-    for par in paramSplit:
-        params.append(Float(par))
-    
-    return(srcType,params)
-    
-def calcBeamSrcMonoAreaGauss(srcWidth,verbose=False):
+def calcBeamSrcMonoArea(srcKey,verbose=False):
     #calculate monochromatic beam areas using full or simple beam treatment
     #print '\nCalculating monochromatic beam areas...'
 
@@ -299,13 +246,11 @@ def calcBeamSrcMonoAreaGauss(srcWidth,verbose=False):
         arcsec2Sr
     except:
         #define arcsec2Sr
-        arcsec2Sr = (Math.PI/(60.*60.*180))**2
-
-    key=src2key('Gaussian',[srcWidth])
+        arcsec2Sr = (PI/(60.*60.*180))**2
     
     try:
-        beamMonoSrcArea[key]
-        if (verbose):print'Using existing monochromatic areas (key %s)'%key
+        beamMonoSrcArea[srcKey]
+        if (verbose):print'Using existing monochromatic areas (key %s)'%srcKey
         #exists, don't recalculate
     except:
         #doesn't exist, recalculate
@@ -320,19 +265,19 @@ def calcBeamSrcMonoAreaGauss(srcWidth,verbose=False):
         beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
         #define srcProf to be same length as beamRad
     
-        srcProf=EXP(-beamRad**2/(2.*srcWidth**2))
+        srcProf=srcMod.src2Prof(srcKey,beamRad,verbose=True)
         
         gamma = beamProfs.meta['gamma'].double
-        beamMonoSrcArea[key] = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        beamMonoSrcArea[srcKey] = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         for band in spireBands:
-            if (verbose):print 'Calculating monochromatic beam areas for %.2f arcsec Gaussian source for %s band'%(srcWidth,band)
+            if (verbose):print 'Calculating monochromatic beam areas for %s source for %s band'%(srcKey,band)
             #monochromatic beam areas
-            beamMonoSrcArea[key][band] = spireMonoSrcAreas(getSpireFreq(), beamProfs, 
+            beamMonoSrcArea[srcKey][band] = spireMonoSrcAreas(getSpireFreq(), beamProfs, 
               getSpireEffFreq()[band], gamma, srcProf, band)
+        if (verbose):print 'All beam areas calculated for %s source'%srcKey
+    return beamMonoSrcArea[srcKey]
 
-    return beamMonoSrcArea[key],key
-
-def calcKColESrc(alphaK,srcWidth,verbose=False):
+def calcKColESrc(alphaK,srcKey,verbose=False,table=False):
     #-----------------------------------------------------------------------
     #print '\nCalculating extended source colour correction parameters over alpha...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -354,9 +299,9 @@ def calcKColESrc(alphaK,srcWidth,verbose=False):
         for band in spireBands:
             k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
              getSpireFilt()[band], BB=False, alpha=alphaK,\
-             ext=True, monoArea=calcBeamSrcMonoArea(srcWidth)[band])[0]/1.e6
+             ext=True, monoArea=calcBeamSrcMonoArea(srcKey,verbose=verbose)[band])[0]/1.e6
             kColESrc[band] = k4EaTot_x / k4E_Tot[band]
-        if (verbose): print 'Calculated KColE for alpha=%f and source Width: '%alphaK,kColE
+        if (verbose): print 'Calculated KColE for alpha=%f and source Width: '%alphaK,kColESrc
     else:
         # alphaK is list
         kColESrc = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
@@ -364,18 +309,29 @@ def calcKColESrc(alphaK,srcWidth,verbose=False):
             for band in spireBands:
                 k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                  getSpireFilt()[band], BB=False, alpha=alphaK[a],\
-                 ext=True, monoArea=calcBeamSrcMonoArea(srcWidth)[band])[0]/1.e6
-                kColE[band][a] = k4EaTot_x / k4E_Tot[band]
-            if (verbose): print 'Calculated KColE for alpha=%f: '%alphaK[a],kColE["PSW"][a],kColE["PMW"][a],kColE["PLW"][a]
+                 ext=True, monoArea=calcBeamSrcMonoArea(srcKey,verbose=verbose)[band])[0]/1.e6
+                kColESrc[band][a] = k4EaTot_x / k4E_Tot[band]
+            if (verbose): print 'Calculated KColE for alpha=%f: '%alphaK[a],kColESrc["PSW"][a],kColESrc["PMW"][a],kColESrc["PLW"][a]
 
     if not table:
         #return as is
-        return kColE
+        return kColESrc
     else:
         #create and returnTableDataset
         kColE_table=TableDataset()
-        kColE_table.setDescription("Extended Source Colour Correction (Spectral Index)")
+        kColE_table.setDescription("Partially Extended Source Colour Correction (Spectral Index)")
         kColE_table.addColumn("alpha",Column(Double1d(alphaK)))
         for band in spireBands:
-            kColE_table.addColumn(band,Column(kColE[band]))
+            kColE_table.addColumn(band,Column(kColESrc[band]))
         return kColE_table
+
+def semiExtendedTest():
+
+    #make Gaussian source
+    alphaK=2.0
+    srcWidths=[1.,10.,100.,1000]
+    KColE_full=calcKColE(alphaK,verbose=True)
+    KColE_partial=[]
+    for wid in srcWidths:
+        srcKey=srcMod.setSrc('Gaussian',[wid])
+        KColE_partial.append(calcKColESrc(alphaK,srcKey,verbose=True,table=False))
