@@ -50,7 +50,6 @@
 # 
 #  The following global variables are defined and used:
 #         spireCalPhot: [context] Spire Calibration Context for Photometer
-#         spireBands:   [string list] SPIRE band names ["PSW","PMW","PLW"]
 #         spireFreq:    [float array] frequency raster across all bands
 #         spireRefFreq: [dict] SPIRE reference frequencies (1 scalar per band)
 #         spireEffFreq: [dict] SPIRE effective frequencies (1 scalar per band)
@@ -60,6 +59,13 @@
 #         arcsec2Sr:    [float] conversion fron square arcseconds to steradians
 #
 #  The functions are as follows:
+#  * spireBands:
+#     Defines names for SPIRE bands
+#     - Inputs:
+#         NONE
+#     - Outputs:
+#         [string list] SPIRE band names ["PSW","PMW","PLW"]
+#
 #  * getCal:
 #     Gets calibration Context from pool or file, and/or checks existing cal
 #     - Inputs:
@@ -72,7 +78,6 @@
 #         cal:     [SpireCal context] Spire Calibration Context for Photometer
 #     - Global Variables used:
 #         spireCalPhot: [context] Spire Calibration Context for Photometer
-#         spireBands:   [string list] SPIRE band names ["PSW","PMW","PLW"]
 #
 #  * getSpireFreq:
 #     Gets frequency raster.
@@ -343,6 +348,10 @@ MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 #===============================================================================
 #-------------------------------------------------------------------------------
 
+def spireBands():
+    bands=['PSW','PMW','PLW']
+    return(bands)
+
 def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     # if cal not defined, read from pool or jarFile
     # if cal is defined, don't read anything new. Just check and return cal
@@ -350,7 +359,6 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     
     #set global variables
     global spireCalPhot #Photometer Calibration Context (spireCal.getPhot())
-    global spireBands # list of SPIRE band names
 
     try:
         spireCalPhot
@@ -393,24 +401,12 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
             spireCalPhot=cal.getPhot()
         
         assert spireCalPhot.isValid(),'ERROR: Invalid SPIRE Photometer calibration tree'
-
-    #define spireBands
-    try:
-        spireBands
-    except:
-        spireBands=['PSW','PMW','PLW']
     
     return(spireCalPhot)
     
 def getSpireFreq():
     # Frequency raster of common frequency grid spanning all three spire bands
 
-    #define spireBands
-    try:
-        spireBands
-    except:
-        spireBands=['PSW','PMW','PLW']
-        
     #define global variable
     global spireFreq #raster of frequencies used throughout functions
     try:
@@ -439,10 +435,8 @@ def getSpireRefFreq():
         spireRefFreq = {}
         c = Constant.SPEED_OF_LIGHT.value
         spireRefWl = {"PSW":250.*1e-6, "PMW":350.*1.e-6, "PLW":500.*1.e-6}
-        spireBands=["PSW","PMW","PLW"]
-        for band in spireBands:
+        for band in spireBands():
             spireRefFreq[band] = c/spireRefWl[band]
-     
     return(spireRefFreq)
 
 
@@ -457,11 +451,11 @@ def getSpireEffFreq():
         #global variable already exists, so do nothing
     except:
         #doesn't exist, so get from calFile
-        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
+        beamProfs = getCal().getProduct("RadialCorrBeam")
         spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
             "PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
             "PLW":beamProfs.meta['freqEffPlw'].double*1.e9}
-    
+
     return(spireEffFreq)
 
 def getSpireFilt(rsrfOnly=False):
@@ -477,7 +471,8 @@ def getSpireFilt(rsrfOnly=False):
         #spireFiltOnly not defined, so must calculate
 
         #check spireCalPhot exists
-        assert spireCalPhot.isValid(), 'Invalid SPIRE Photometer calibration tree. Run getCalPhot()'
+        #spireCalPhot=getCal()
+        assert spireCalPhot.isValid(), 'Invalid SPIRE Photometer calibration tree. Run getCal()'
 
         #read RSRF and Aperture Efficiency from calibration tree
         rsrf=spireCalPhot.getProduct('Rsrf')
@@ -494,7 +489,7 @@ def getSpireFilt(rsrfOnly=False):
         spireFiltOnly={}
         #interpolate to freq array
     
-        for band in spireBands:
+        for band in spireBands():
             #create Rsrf and ApEff interpolation objects
             interpRsrf = LinearInterpolator(spireRsrfFreq, rsrf.getRsrf(band))
             #make arrays for final objects
@@ -518,7 +513,7 @@ def getSpireFilt(rsrfOnly=False):
         # spire RSRF * ApEff
         spireFilt={}
         #interpolate to freq array and apply to RSRF
-        for band in spireBands:
+        for band in spireBands():
             #create ApEff interpolation objects
             interpAp = LinearInterpolator(spireApEffFreq, apertureEfficiency.getApertEffTable()[band].data)
             #make arrays for final objects
@@ -586,7 +581,7 @@ def calcBeamMonoArea(beamType=None,verbose=False):
             neptuneArea['PSW']=beamProfs.meta['beamNeptunePswSr'].double
             neptuneArea['PMW']=beamProfs.meta['beamNeptunePmwSr'].double
             neptuneArea['PLW']=beamProfs.meta['beamNeptunePlwSr'].double
-            for band in spireBands:
+            for band in spireBands():
                 if (verbose):print 'Calculating monochromatic beam areas for %s band (Simple treatment)'%band
                 beamMonoArea[band]=neptuneArea[band] * (getSpireFreq()/getSpireEffFreq()[band])**(2.*gamma)
 
@@ -594,7 +589,7 @@ def calcBeamMonoArea(beamType=None,verbose=False):
         else:
             #use full beam treatment
             beamMonoArea['beamType']='Full'
-            for band in spireBands:
+            for band in spireBands():
                 if (verbose):print 'Calculating monochromatic beam areas for %s band (Full treatment)'%band
                 #monochromatic beam areas
                 beamMonoArea[band] = spireMonoAreas(getSpireFreq(), beamProfs, 
@@ -952,7 +947,7 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
     if not aList:
         # alphaK is a scalar
         beamArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        for band in spireBands:
+        for band in spireBands():
             #pipeline beam areas
             beamArea[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
               calcBeamMonoArea()[band], BB=False, alpha=alphaK)/arcsec2Sr
@@ -961,7 +956,7 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
         # tempK is a list
         beamArea = {'PSW': Double1d(na,Double.NaN),'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         for a in range(na):
-            for band in spireBands:
+            for band in spireBands():
                 beamArea[band][a]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band],\
                   calcBeamMonoArea()[band], BB=False, alpha=alphaK[a])/arcsec2Sr
             if (verbose): print 'Calculated Omega_eff for alpha=%f: '%alphaK[a],beamArea["PSW"][a],beamArea["PMW"][a],beamArea["PLW"][a]
@@ -974,7 +969,7 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
         beamArea_table=TableDataset()
         beamArea_table.setDescription("Beam Solid Angle (Spectral Index)")
         beamArea_table.addColumn("alpha",Column(Double1d(alphaK)))
-        for band in spireBands:
+        for band in spireBands():
             beamArea_table.addColumn(band,Column(beamArea[band],unit=SolidAngle.STERADIANS,description=''))
         return(beamArea_table)
 
@@ -996,7 +991,7 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
     if not tList:
         # tempK is scalars
         beamAreaBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        for band in spireBands:
+        for band in spireBands():
             #pipeline beam areas
             beamAreaBB[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
               calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK)/arcsec2Sr
@@ -1006,7 +1001,7 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
         # tempK is a list
         beamAreaBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
-            for band in spireBands:
+            for band in spireBands():
                 #pipeline beam areas
                 beamAreaBB[band][t]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
                   calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK[t])/arcsec2Sr
@@ -1021,7 +1016,7 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
         beamAreaBB_table.setDescription("Beam Solid Angle (Modified Black Body, beta=%.2f)"%betaK)
         beamAreaBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
         beamAreaBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
-        for band in spireBands:
+        for band in spireBands():
             beamAreaBB_table.addColumn(band,Column(beamAreaBB[band],unit=SolidAngle.STERADIANS,description=''))
         return(beamAreaBB_table)
        
@@ -1040,7 +1035,7 @@ def calcKBeam(alphaK,verbose=False,table=False):
         # alphaK is a scalar
         kBeam = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         beamEff = calcOmegaEff(alphaK)
-        for band in spireBands:
+        for band in spireBands():
             #pipeline beam areas
             kBeam[band] = beamAreaPip[band]/beamEff[band]
         if verbose: print 'Calculated KBeam for alpha=%f: '%alphaK,kBeam
@@ -1049,7 +1044,7 @@ def calcKBeam(alphaK,verbose=False,table=False):
         kBeam = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         beamEff = calcOmegaEff(alphaK)
         for a in range(na):
-            for band in spireBands:
+            for band in spireBands():
                 #pipeline beam areas
                 kBeam[band][a] = beamAreaPip[band]/beamEff[band][a]
             if verbose: print 'Calculated KBeam for alpha=%f: '%alphaK[a],kBeam["PSW"][a],kBeam["PMW"][a],kBeam["PLW"][a]
@@ -1062,7 +1057,7 @@ def calcKBeam(alphaK,verbose=False,table=False):
         kBeam_table=TableDataset()
         kBeam_table.setDescription("Beam Colour Correction (Spectral Index)")
         kBeam_table.addColumn("alpha",Column(Double1d(alphaK)))
-        for band in spireBands:
+        for band in spireBands():
             kBeam_table.addColumn(band,Column(kBeam[band]))
         return kBeam_table
 #
@@ -1081,7 +1076,7 @@ def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
         # tempK is scalar
         kBeamBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         beamEff = calcOmegaEff_BB(betaK,tempK)
-        for band in spireBands:
+        for band in spireBands():
             #pipeline beam areas
             kBeamBB[band] = beamAreaPip[band]/beamEff[band]
         if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK),kBeamBB
@@ -1090,7 +1085,7 @@ def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
         kBeamBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         beamEff = calcOmegaEff_BB(betaK,tempK)
         for t in range(nt):
-            for band in spireBands:
+            for band in spireBands():
                 #pipeline beam areas
                 kBeamBB[band][t] = beamAreaPip[band]/beamEff[band][t]
             if (verbose): print 'Calculated KBeam for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),kBeamBB["PSW"][t],kBeamBB["PMW"][t],kBeamBB["PLW"][t]
@@ -1104,7 +1099,7 @@ def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
         kBeamBB_table.setDescription("Beam Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
         kBeamBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
         kBeamBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
-        for band in spireBands:
+        for band in spireBands():
             kBeamBB_table.addColumn(band,Column(kBeamBB[band]))
         return(kBeamBB_table)
 
@@ -1119,9 +1114,9 @@ def calcK4P():
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
-
+    getCal()
     k4P = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    for band in spireBands:
+    for band in spireBands():
         k4P[band] = calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
         BB=False, ext=False)[0]
         pass
@@ -1131,23 +1126,24 @@ def calcKMonE():
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal=cal)
-
+    getCal()
     kMonE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    for band in spireBands:
+    for band in spireBands():
         kMonE[band] = calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
         BB=False, alpha=-1.0, ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.0e6
         pass
+
     return kMonE
 
 def calcK4E():
-
+    getCal()
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #spireBands=["PSW","PMW","PLW"]
     
     k4E = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
     kMonE = calcKMonE()
     omegaEff = calcOmegaEff(-1.0)
-    for band in spireBands:
+    for band in spireBands():
         k4E[band] = kMonE[band] * omegaEff[band] * arcsec2Sr * 1.0e6
         pass
     return k4E
@@ -1159,7 +1155,7 @@ def calcKPtoE():
     kPtoE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
     kmonE = calcKMonE()
     k4p = calcK4P()
-    for band in spireBands:
+    for band in spireBands():
         kPtoE[band] = kmonE[band]/k4p[band]
     return kPtoE
 
@@ -1187,7 +1183,7 @@ def calcKColP(alphaK,verbose=False,table=False):
     if not aList:
         # alphaK is scalar
         kColP = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        for band in spireBands:
+        for band in spireBands():
             kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                getSpireFreq(), getSpireFilt()[band], BB=False, alpha=alphaK)[0]
             #point source colour correction for current alpha
@@ -1198,7 +1194,7 @@ def calcKColP(alphaK,verbose=False,table=False):
         kColP = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
 
         for a in range(na):
-            for band in spireBands:
+            for band in spireBands():
                 kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                    getSpireFreq(), getSpireFilt()[band], BB=False, alpha=alphaK[a])[0]
                 #point source colour correction for current alpha
@@ -1213,7 +1209,7 @@ def calcKColP(alphaK,verbose=False,table=False):
         kColP_table=TableDataset()
         kColP_table.setDescription("Point Source Colour Correction (Spectral Index)")
         kColP_table.addColumn("alpha",Column(Double1d(alphaK)))
-        for band in spireBands:
+        for band in spireBands():
             kColP_table.addColumn(band,Column(kColP[band]))
         return kColP_table
 
@@ -1235,7 +1231,7 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
     
     if not tList:
         kColPBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        for band in spireBands:
+        for band in spireBands():
             kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                 getSpireFreq(), getSpireFilt()[band], BB=True, beta=betaK, temp=tempK)[0]
             #point source colour correction for current beta,temp
@@ -1244,7 +1240,7 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
     else:
         kColPBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
-            for band in spireBands:
+            for band in spireBands():
                 kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                     getSpireFreq(), getSpireFilt()[band], BB=True, beta=betaK, temp=tempK[t])[0]
                 #point source colour correction for current beta,temp
@@ -1260,7 +1256,7 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
         kColPBB_table.setDescription("Point Source Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
         kColPBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
         kColPBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
-        for band in spireBands:
+        for band in spireBands():
             kColPBB_table.addColumn(band,Column(kColPBB[band]))
         return(kColPBB_table)
 #-----------------------------------------------------------------------
@@ -1278,7 +1274,7 @@ def calcKColE(alphaK,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     k4E_Tot=calcKMonE()
-
+    print k4E_Tot
     try:
         na=len(alphaK)
         aList=True
@@ -1289,7 +1285,7 @@ def calcKColE(alphaK,verbose=False,table=False):
         # alphaK is scalar
         kColE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         #kBeamK = calcKBeam(alphaK)
-        for band in spireBands:
+        for band in spireBands():
             k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
              getSpireFilt()[band], BB=False, alpha=alphaK,\
              ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
@@ -1299,7 +1295,7 @@ def calcKColE(alphaK,verbose=False,table=False):
         # alphaK is list
         kColE = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         for a in range(na):
-            for band in spireBands:
+            for band in spireBands():
                 k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                  getSpireFilt()[band], BB=False, alpha=alphaK[a],\
                  ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
@@ -1314,7 +1310,7 @@ def calcKColE(alphaK,verbose=False,table=False):
         kColE_table=TableDataset()
         kColE_table.setDescription("Extended Source Colour Correction (Spectral Index)")
         kColE_table.addColumn("alpha",Column(Double1d(alphaK)))
-        for band in spireBands:
+        for band in spireBands():
             kColE_table.addColumn(band,Column(kColE[band]))
         return kColE_table
 #-----------------------------------------------------------------------
@@ -1337,7 +1333,7 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
     if not tList:
         kColEBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
 
-        for band in spireBands:
+        for band in spireBands():
             k4EbTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                   getSpireFilt()[band], BB=True, beta=betaK, temp=tempK,\
                   ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
@@ -1346,7 +1342,7 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
     else:
         kColEBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
-            for band in spireBands:
+            for band in spireBands():
                 k4EbTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                       getSpireFilt()[band], BB=True, beta=betaK, temp=tempK[t],\
                       ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
@@ -1362,7 +1358,7 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
         kColEBB_table.setDescription("Extended Source Colour Correction (Modified Black Body, beta=%.2f)"%betaK)
         kColEBB_table.meta['beta']=DoubleParameter(betaK,"Emissivity spectral index")
         kColEBB_table.addColumn("Temperature",Column(Double1d(tempK),unit=Temperature.KELVIN,description=''))
-        for band in spireBands:
+        for band in spireBands():
             kColEBB_table.addColumn(band,Column(kColEBB[band]))
         return(kColEBB_table)
 #
@@ -1428,7 +1424,7 @@ def compFullSimple():
     cols={'PSW':java.awt.Color.BLUE,\
       'PMW':java.awt.Color.GREEN,\
       'PLW':java.awt.Color.RED}
-    for band in spireBands:
+    for band in spireBands():
         pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_F[band],name='Beam Area %s (full)'%band,\
           color=cols[band]))
         pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band],name='Beam Area %s (simple)'%band,\
