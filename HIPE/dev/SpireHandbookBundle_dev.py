@@ -45,7 +45,7 @@
 # 
 #  Herschel-SPIRE Colour Corrections
 # 
-#  This module provides functions to calcualte the colour corrections for a
+#  This module provides functions to calculate the colour corrections for a
 #  range of source spectra, and for both point sources and extended sources
 # 
 #  The following global variables are defined and used:
@@ -247,7 +247,7 @@
 #   * spireEffArea: Calculate effective RSRF-weighted beam area for a given spectrum (power law or modified black-body)
 #   * spireMonoBeam: Calculate monochromatic beam profile & area at a given freq
 #   * spireMonoAreas: Calculate monochromatic beam areas at range of frequencies
-#   * hpXcalKcorr: Calculate K-correction parameters for given spectrum (power law or modified black body)
+#   * calcSpireKcorr: Calculate K-correction parameters for given spectrum (power law or modified black body)
 #
 #  Example test functions are provided:
 #   * spireColCorrTest
@@ -404,6 +404,13 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     
 def getSpireFreq():
     # Frequency raster of common frequency grid spanning all three spire bands
+
+    #define spireBands
+    try:
+        spireBands
+    except:
+        spireBands=['PSW','PMW','PLW']
+        
     #define global variable
     global spireFreq #raster of frequencies used throughout functions
     try:
@@ -809,7 +816,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 #-------------------------------------------------------------------------------
 # Calculate K-correction parameters for given spectrum & source type
-def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
+def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
   ext=False, monoArea=None):
     """
     ================================================================================
@@ -875,6 +882,7 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
                              (previsuly applie directly to RSRFs, i.e. in the numerator too)
     2013/12/03  C. North     corrected procedure include area where appropriate
                   NB: if ext=True , note output units
+    2014/04/15  C. North     Renamed script to calcSpireKcorr
     
     ================================================================================
     """
@@ -1114,7 +1122,7 @@ def calcK4P():
 
     k4P = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
     for band in spireBands:
-        k4P[band] = hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
+        k4P[band] = calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
         BB=False, ext=False)[0]
         pass
     return k4P
@@ -1126,7 +1134,7 @@ def calcKMonE():
 
     kMonE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
     for band in spireBands:
-        kMonE[band] = hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
+        kMonE[band] = calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(), getSpireFilt()[band], \
         BB=False, alpha=-1.0, ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.0e6
         pass
     return kMonE
@@ -1180,7 +1188,7 @@ def calcKColP(alphaK,verbose=False,table=False):
         # alphaK is scalar
         kColP = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         for band in spireBands:
-            kConvPsrc=hpXcalKcorr(getSpireRefFreq()[band],\
+            kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                getSpireFreq(), getSpireFilt()[band], BB=False, alpha=alphaK)[0]
             #point source colour correction for current alpha
             kColP[band] = kConvPsrc/k4P[band]
@@ -1191,7 +1199,7 @@ def calcKColP(alphaK,verbose=False,table=False):
 
         for a in range(na):
             for band in spireBands:
-                kConvPsrc=hpXcalKcorr(getSpireRefFreq()[band],\
+                kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                    getSpireFreq(), getSpireFilt()[band], BB=False, alpha=alphaK[a])[0]
                 #point source colour correction for current alpha
                 kColP[band][a] = kConvPsrc/k4P[band]
@@ -1228,7 +1236,7 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
     if not tList:
         kColPBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         for band in spireBands:
-            kConvPsrc=hpXcalKcorr(getSpireRefFreq()[band],\
+            kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                 getSpireFreq(), getSpireFilt()[band], BB=True, beta=betaK, temp=tempK)[0]
             #point source colour correction for current beta,temp
             kColPBB[band] = kConvPsrc/k4P[band]
@@ -1237,7 +1245,7 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
         kColPBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
             for band in spireBands:
-                kConvPsrc=hpXcalKcorr(getSpireRefFreq()[band],\
+                kConvPsrc=calcSpireKcorr(getSpireRefFreq()[band],\
                     getSpireFreq(), getSpireFilt()[band], BB=True, beta=betaK, temp=tempK[t])[0]
                 #point source colour correction for current beta,temp
                 kColPBB[band][t] = kConvPsrc/k4P[band]
@@ -1282,7 +1290,7 @@ def calcKColE(alphaK,verbose=False,table=False):
         kColE = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         #kBeamK = calcKBeam(alphaK)
         for band in spireBands:
-            k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+            k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
              getSpireFilt()[band], BB=False, alpha=alphaK,\
              ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
             kColE[band] = k4EaTot_x / k4E_Tot[band]
@@ -1292,7 +1300,7 @@ def calcKColE(alphaK,verbose=False,table=False):
         kColE = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         for a in range(na):
             for band in spireBands:
-                k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+                k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                  getSpireFilt()[band], BB=False, alpha=alphaK[a],\
                  ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
                 kColE[band][a] = k4EaTot_x / k4E_Tot[band]
@@ -1330,7 +1338,7 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
         kColEBB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
 
         for band in spireBands:
-            k4EbTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+            k4EbTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                   getSpireFilt()[band], BB=True, beta=betaK, temp=tempK,\
                   ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
             kColEBB[band] = k4EbTot_x / k4E_Tot[band]
@@ -1339,7 +1347,7 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
         kColEBB = {'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         for t in range(nt):
             for band in spireBands:
-                k4EbTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+                k4EbTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                       getSpireFilt()[band], BB=True, beta=betaK, temp=tempK[t],\
                       ext=True, monoArea=calcBeamMonoArea()[band])[0]/1.e6
                 kColEBB[band][t] = k4EbTot_x / k4E_Tot[band]

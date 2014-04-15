@@ -18,15 +18,17 @@
 #
 #===============================================================================
 # 
-#  Herschel-SPIRE Colour Correction factors 
+#  Herschel-SPIRE Semi-Extended source Colour Correction factors 
 # 
-#  This routine calculates colour correction tables to convert from the standard
-#  pipeline flux densities (which are quoted for a nu*F_nu=const. spectrum) into 
-#  flux densities for a range of source spectra. These produce monochromatic flux
-#  densities at the SPIRE reference wavelengths of 250, 350 and 500 micron. The
-#  source spectra include power law spectra, and modified black body spectra with
-#  a range of emissivities. Metadata values are produced for the flux conversion
-#  parameters applied to the pipeline (the "K4P" and "K4E" parameters).
+#  This routine calculates colour correction tables for partially extented sources
+#  to convert from the standard pipeline flux densities (which are quoted for a 
+#  nu*F_nu=const. spectrum) into flux densities for a range of source spectra.
+#  
+#  These produce monochromatic peak surface brightnesses at the SPIRE reference 
+#  wavelengths of 250, 350 and 500 micron. The source spectra include power law 
+#  spectra, and modified black body spectra with a range of emissivities.
+#
+#  The script relies on functions in SpireHandbookBundle_dev.py
 #
 #  Input:
 #    RSRF and Aperture efficiency profiles from SPIRE calibration tree
@@ -35,8 +37,11 @@
 #    Name and version of output file
 #
 #  Output:
-#    SCalPhotColorCorrK_point product
-#    SCalPhotColorCorrK_extended product
+#    Functions which can be used to calculate colour correction parameters
+#    Some of them also generate global variables
+#
+#  Usage:
+#    A script is provided at the end for usage of the functions
 #
 #===============================================================================
 # 
@@ -49,12 +54,7 @@
 #===============================================================================
 # 
 #  Edition History
-#   E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
-#   E. Polehampton   31-10-2013  - update for new input file
-#   E. Polehampton   21-01-2014  - add table descriptions and update numbers (SPCAL-93)
-#   Chris North      18-02-2014  - updated to use full calculation instead of reading csv files
-#   Ivan Valtchanov  15-03-2014  - reformatted to functions and a script bundle to distribute with the handbook
-#   Chris North      03-04-2014  - reformatted functions to remove dependence on global variables
+#   Chris North      15-04-2014  - Initial version
 #
 #===============================================================================
 
@@ -91,8 +91,9 @@ import sources_dev as srcMod
 def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array):
     """
     ========================================================================
-    Implements the full beam model to generate the monochromatic beam profile
-    and corresponding monochromatic beam solid angle at a given frequency.
+    Implements the full beam model, convolved with a source profile,
+    to generate the monochromatic beam profile and corresponding monochromatic
+    beam solid angle at a given frequency.
 
     Inputs:
       freqx:     (float) frequency [Hz] for which monochromatic beam
@@ -297,7 +298,7 @@ def calcKColESrc(alphaK,srcKey,verbose=False,table=False):
         kColESrc = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         #kBeamK = calcKBeam(alphaK)
         for band in spireBands:
-            k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+            k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
              getSpireFilt()[band], BB=False, alpha=alphaK,\
              ext=True, monoArea=calcBeamSrcMonoArea(srcKey,verbose=verbose)[band])[0]/1.e6
             kColESrc[band] = k4EaTot_x / k4E_Tot[band]
@@ -307,7 +308,7 @@ def calcKColESrc(alphaK,srcKey,verbose=False,table=False):
         kColESrc = {'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         for a in range(na):
             for band in spireBands:
-                k4EaTot_x=hpXcalKcorr(getSpireRefFreq()[band], getSpireFreq(),\
+                k4EaTot_x=calcSpireKcorr(getSpireRefFreq()[band], getSpireFreq(),\
                  getSpireFilt()[band], BB=False, alpha=alphaK[a],\
                  ext=True, monoArea=calcBeamSrcMonoArea(srcKey,verbose=verbose)[band])[0]/1.e6
                 kColESrc[band][a] = k4EaTot_x / k4E_Tot[band]
