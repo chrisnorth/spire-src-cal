@@ -56,7 +56,6 @@
 #         spireFiltOnly:[dict] filter profile without aperture efficiency (1 array per band)
 #         spireFilt:    [dict] filter profile with aperture efficiency (1 array per band)
 #         beamMonoArea: [dict] SPIRE monochromatic areas (1 array per bands, plus 'beamType')
-#         arcsec2Sr:    [float] conversion fron square arcseconds to steradians
 #
 #  The functions are as follows:
 #  * spireBands:
@@ -65,6 +64,13 @@
 #         NONE
 #     - Outputs:
 #         [string list] SPIRE band names ["PSW","PMW","PLW"]
+#
+#  * arcsec2Sr:
+#     Defines conversion from arcsec^2 so sr
+#     - Inputs:
+#         NONE
+#     - Outputs:
+#         [float] conversion factor
 #
 #  * getCal:
 #     Gets calibration Context from pool or file, and/or checks existing cal
@@ -126,7 +132,6 @@
 #          [dict] SPIRE monochromatic areas (1 array per band + beamType)
 #      - Global variables used:
 #          beamMonoArea [dict] SPIRE monochromatic areas (1 array per band + beamType)
-#          arcsec2Sr: [float] conversion fron square arcseconds to steradians
 #
 #   * calcOmegaEff:
 #      Calculates effective beam area for power law spectrum.
@@ -351,7 +356,10 @@ MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 def spireBands():
     bands=['PSW','PMW','PLW']
     return(bands)
-
+def arcsec2Sr():
+    arcsec2Sr = (PI/(60.*60.*180))**2
+    return(arcsec2Sr)
+    
 def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     # if cal not defined, read from pool or jarFile
     # if cal is defined, don't read anything new. Just check and return cal
@@ -534,15 +542,8 @@ def calcBeamMonoArea(beamType=None,verbose=False):
     #print '\nCalculating monochromatic beam areas...'
 
     #define global variables
-    global arcsec2Sr #conversion from acrsec^2 to steradians
     global beamMonoArea #monochromatic beam areas over spireFreq
 
-    try:
-        arcsec2Sr
-    except:
-        #define global variable arcsec2Sr
-        arcsec2Sr = (PI/(60.*60.*180))**2
-    
     try:
         beamMonoArea['PSW'][0]
         docalc=False
@@ -769,7 +770,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
     """
 
-    arcsec2Sr = (PI/(60.*60.*180))**2
+    #arcsec2Sr = (PI/(60.*60.*180))**2
 
     #set up a sparser range of frequencies (otherwise it takes too long)
     nNu=len(freq)
@@ -798,7 +799,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
     # interpolate to full frequency array and convert to Sr
     beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
-    beamMonoArea=beamInterp(freq)*arcsec2Sr #in sr
+    beamMonoArea=beamInterp(freq)*arcsec2Sr() #in sr
     
     return(beamMonoArea)
 
@@ -885,6 +886,7 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
     h = Constant.H_PLANCK.value
     k = Constant.K_BOLTZMANN.value
     c = Constant.SPEED_OF_LIGHT.value
+    print 'freq',freq0,freq[1],transm[1]
     #
     # Calculate sky background model
     #
@@ -950,7 +952,7 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
         for band in spireBands():
             #pipeline beam areas
             beamArea[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
-              calcBeamMonoArea()[band], BB=False, alpha=alphaK)/arcsec2Sr
+              calcBeamMonoArea()[band], BB=False, alpha=alphaK)/arcsec2Sr()
         if (verbose): print 'Calculated Omega_eff for alpha=%f: '%alphaK,beamArea
     else:
         # tempK is a list
@@ -958,7 +960,7 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
         for a in range(na):
             for band in spireBands():
                 beamArea[band][a]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band],\
-                  calcBeamMonoArea()[band], BB=False, alpha=alphaK[a])/arcsec2Sr
+                  calcBeamMonoArea()[band], BB=False, alpha=alphaK[a])/arcsec2Sr()
             if (verbose): print 'Calculated Omega_eff for alpha=%f: '%alphaK[a],beamArea["PSW"][a],beamArea["PMW"][a],beamArea["PLW"][a]
 
     if not table:
@@ -994,7 +996,7 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
         for band in spireBands():
             #pipeline beam areas
             beamAreaBB[band]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
-              calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK)/arcsec2Sr
+              calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK)/arcsec2Sr()
         if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK),beamAreaBB
 
     else:
@@ -1004,7 +1006,7 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
             for band in spireBands():
                 #pipeline beam areas
                 beamAreaBB[band][t]=spireEffArea(getSpireFreq(), getSpireFilt(rsrfOnly=True)[band], \
-                  calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK[t])/arcsec2Sr
+                  calcBeamMonoArea()[band], BB=True, beta=betaK, temp=tempK[t])/arcsec2Sr()
             if (verbose): print 'Calculated Omega_eff for modBB with beta=%f and T=%f: '%(betaK,tempK[t]),beamAreaBB["PSW"][t],beamAreaBB["PMW"][t],beamAreaBB["PLW"][t]
 
     if not table:
@@ -1144,7 +1146,7 @@ def calcK4E():
     kMonE = calcKMonE()
     omegaEff = calcOmegaEff(-1.0)
     for band in spireBands():
-        k4E[band] = kMonE[band] * omegaEff[band] * arcsec2Sr * 1.0e6
+        k4E[band] = kMonE[band] * omegaEff[band] * arcsec2Sr() * 1.0e6
         pass
     return k4E
 
