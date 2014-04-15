@@ -13,7 +13,8 @@
 #   * spireEffArea: Calculate the effective beam area for a given spectrum
 #   * spireFindEffFreq: Calculate the effective frequency for SPIRE
 #   * spireEffBeam: Calculate the effective beam profile, area and beam map for SPIRE
-#   * hpXcalKcorr: Calculate K-correction parameters for given spectrum & source type
+#   * spireMonoBeamSrc: Calculate monochromatic beam area, convolved with source profile, at a given frequency
+#   * spireMonoSrcAreas: Calculate monochromatic beam areas convolved with source profile over a range of frequencies
 
 #-------------------------------------------------------------------------------
 # Calculate monochromatic beam profile and area at a given frequency
@@ -540,143 +541,155 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 
 	return(effBeamMap)
 
+
 #-------------------------------------------------------------------------------
-# Calculate K-correction parameters for given spectrum & source type
-def hpXcalKcorr(freq0, freq, transm, BB=True, UD=True, temp=20.0, beta=1.8, alpha=-1.0,
-                userSpec=None, ext=False, monoArea=None, verbose=False):
-	"""
-	================================================================================
-	Calculation of the K-correction factor from isophotal flux to a monochromatic 
-	flux-density at a given reference frequency (data to be multiplied!)
-	This routine is needed by hpXcalColorCorr.py
-	
-	Inputs:
-	  freq0:     (float) waveband reference frequency [Hz] for which monochromatic
-	               flux-density is given
-	  freq:      (array float) frequency vector corresponding to RSRF values [Hz]
-	  transm:    (array float) relative spectral response (RSRF) corresponding to freq
-	  BB:         (boolean) set to use modified black body spectrum with
-                        temperature temp and emissivity index beta
-	                OPTIONAL. Default=False
-	  UD:        (boolean) set to use user-defined spectrum given by
-                       userSpec
-	               OPTIONAL. Default=False
-	  alpha:     (float) Exponent of power-law sky background model
-                       (if BB==False and UD==False)
-	               OPTIONAL. Default=-1
-	  temp:      (float) Dust/sky temperature (if BB=True)
-	               OPTIONAL. Default=20.0
-	  beta:      (float) Dust/sky spectral index (if BB=True)
-	               OPTIONAL. Default=1.8
-	  userSpec:  (array float) User-defined spectrum corresponding to freq.
-                       (if UD=True)
-	               OPTIONAL. Default=None
-	  ext:       (boolean) calculating for extended source
-	                OPTIONAL. Default=False
-	  monoArea:  (array float) Monochromatic Beam solid angle [Sr] corresponding
-	                to freq.
-	                OPTIONAL. Only required if ext=True
-          verbose:   (boolean) Set to print more information.
-                        OPTIONAL. Default=False.
+#===============================================================================
+#=====               PARTIALLY EXTENDED SOURCE CONVOLUTIONS                =====
+#===============================================================================
+#-------------------------------------------------------------------------------
 
-	Outputs:
-	 (double array) [0]: K-correction factor
-	                [1]: Sky emission at reference fequency (fSky0)
-	
-	Calculation:
-	  Depending on the state of the input parameter BB and UD, uses spectrum of a
-	  Planck function multiplied by frequency to the power of beta, a user-defined
-          spectrum, or a power-law spectrum with spectral index alpha. The spectrum
-          is calculated for all values in the vector freq. In addition the same value
-          is calculated at the discrete frequency freq0. Then the product of this 
-          value and the integral of the RSRF over all frequencies, divided by the 
-          integral over all products of frequency and RSRF is calculated.
+#-------------------------------------------------------------------------------
+# Calculate monochromatic beam profile and area at a given frequency (Eq. 5.32) 
+def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array):
+    """
+    ========================================================================
+    Implements the full beam model, convolved with a source profile,
+    to generate the monochromatic beam profile and corresponding monochromatic
+    beam solid angle at a given frequency.
 
-	  N.B. If ext=True, and monoBeam is in units sr, then this procedure outputs
-	    K-correction factor in [Jy/sr per Jy/beam] and Sky emission in Jy/sr.
-	    Units will change if a different input unit is used.
-	
-	Dependencies:
-	  herschel.ia.numeric.toolbox.interp.LinearInterpolator
-	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
+    Inputs:
+      freqx:     (float) frequency [Hz] for which monochromatic beam
+                   profile and area should be calculated
+      beamRad:   (array float) radius vector from the input beam profiles
+      beamProfs: (dataset) PhotRadialCorrBeam object
+                   [used to retrieve core beam profile]
+      beamConst: (array float) constant part of beam profile for "array"
+                       [passed to prevent repeated calls]
+      effFreq:   (float) effective frequency [Hz] of array
+      gamma:     (float) Exponent of powerlaw describing FWHM dependence
+                   on frequency
+      srcProf:   (array float) source density profile, corresponding to
+                   radius column in beamProfs
+      array:     (string) spire array ('Psw'|'Pmw'|'Plw')
 
-	2012/04/18  L. Conversi  initial version in file hp_xcal_Total_v1.6.py.txt
-	2012/08/22  B. Schulz    added comments, reformatted, renamed kCorr to hpXcalKcorr
-	2012/08/24  B. Schulz    fixed defaults for temp and beta, changed inputs to frequency,
-	                         updated header and comments, renamed inputFreq to freq
-	                         and inputFilt to transm added powerlaw sky background
-	2012/08/27  B. Schulz    brush -up on header and comments
-	2013/03/28  B. Schulz    removed implicit limitation to fixed frequency interval
-	2013/04/05  B. Schulz    implemented proper tabulated integration function
-	2013/06/18  L. Conversi  implemented gamma parameter in the denominator
-	                         (previsuly applie directly to RSRFs, i.e. in the numerator too)
-	2013/12/03  C. North     corrected procedure include area where appropriate
-			 	 NB: if ext=True , note output units
-	
-	================================================================================
-	"""
-        # check not both BB and UD are true
-        assert (BB and UD)==False,'ERROR: both BB and UD are set'
-        #check monoArea and transm are of right length
-        assert len(monoArea)==len(freq),\
-                'ERROR: monoArea myst be of same length as freq (%d,%d)'%\
-                (len(monoArea),len(freq))
-        assert len(transm)==len(freq),\
-                'ERROR: transm myst be of same length as freq (%d,%d)'%\
-                (len(transm),len(freq))
+    Outputs:     (list of objects)
+                (float) Beam area [arcsec^2] at frequency freqx
 
-	#
-	# Calculate sky background model
-	#
-	# 1) As a modified Blackbody
-	if BB == 1:
-		if verbose:
-                        print 'Using greybody with T=%.2f, beta=%.3f'%(temp,beta)
-		fSky  = 2*h * freq**3 / c**2 / (EXP(h*freq/k/temp) - 1.) * freq**beta
-		fSky0 = 2*h * freq0**3 / c**2 / (EXP(h*freq0/k/temp) - 1.) * freq0**beta
-	#
-        elif UD == 1:
-                # User-defined spectrum
-                # Check userSpec is of same length
-                assert len(userSpec)==len(freq),\
-                        'ERROR: userSpec must be of same length as freq (%d,%d)'%(len(userSpec),len(freq))
-		if verbose:
-                        print 'Using user-defined spectrum'
-                fSky=userSpec
-                fsKy0=CubicSplineInterplator(freq,userSpec)(freq0)
-	else:
-                # Power-Law
-		if verbose:
-                        print 'Using power law spectrum with spectral index %.2f'%(alpha)
-        	fSky  = freq**alpha
-		fSky0 = freq0**alpha
-	#
-	# Using the K-correction as defined in th OM (eq. 5.5, 5.15 & 5.16)
+    Calculation:
+      Scales the core beam profile width as (freqx/effFreq)^gamma.
+      Queries the calibration file to generate new core beam profile.
+      Uses constant beam profile where it is larger than core profile.
+      Multiplies by a source profile
+      Integrates over radius to calculate beam area.
 
-	if ext == True:
-		area = monoArea
-	else:
-		#don't use area for point sources
-		area = Float1d(len(freq))
-		area[:] = 1.0
+    Dependencies:
+      herschel.ia.numeric.toolbox.interp.LinearInterpolator
+      herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
+      
+    2013/12/19  C. North  initial version
 
-        # monoArea is the monochromatic beam solid angle at effFreq
+    """
 
-	# integrate over frequency
-	numInterp=LinearInterpolator(freq,transm)
-	denomInterp=LinearInterpolator(freq,transm * fSky * area)
-	minFreq=min(freq)
-	maxFreq=max(freq)
+    #calculate the "scaled" radius, as nu^-gamma
+    radNew=beamRad*(freqx/effFreq)**-gamma
+    maxRad=max(beamRad)
+    nRad=len(beamRad)
+    #ensure it doesn't go out of range
+    radNew[radNew.where(radNew > maxRad)]=maxRad
+    #get the corresponding beam profiles
+    beamNew=Double1d(nRad)
+    for r in range(nRad):
+        beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
+    #apply the "constant" beam where appropriate
+    #beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+    isConst=beamNew.where(beamNew < beamConst)
+    beamNew[isConst]=beamConst[isConst]
 
-	integrator=TrapezoidalIntegrator(minFreq,maxFreq)
-	numInteg = integrator.integrate(numInterp)
-	denomInteg = integrator.integrate(denomInterp)
+    #multiply by source Profile
+    beamNew = beamNew*srcProf
 
-	kWave = fSky0 * numInteg / denomInteg
+    ## THIS IS ONLY VALID FOR AREA
+    ## FULL PROFILE OF CONVOLUTION REQUIRES PROPER CONVOLUTION
 
-	#
-	# Return the result as a 2-element array of K-correction and flux at freq0
-	return (Double1d([kWave, fSky0]))
+    #integrate to get solid angle (in arcsec^2)    
+    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    integrator=TrapezoidalIntegrator(0,maxRad)
+    beamMonoArea=integrator.integrate(beamInterp)
+
+    return (beamMonoArea)
+
+#-------------------------------------------------------------------------------
+# Calculate monochromatic beam areas over a range of frequencies
+def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
+
+    """
+    ========================================================================
+    Generates array of monochromatic beam areas over frequency range by
+    calculating over a sparser array and interpolating
+
+    Inputs:
+      freq:      (array float) frequency vector [Hz] for which monochromatic
+                   beams areas should be calculated
+      beamProfs: (dataset) PhotRadialCorrBeam object from calibration tree
+      effFreq:   (float) effective frequency [Hz] of array
+      gamma:     (float) Exponent of powerlaw describing FWHM dependence
+                   on frequency
+      array:     (string) spire array ('Psw'|'Pmw'|'Plw')
+      srcProf:   (array float) source density profile, corresponding to
+                   radius column in beamProfs
+      freqFact:  (int) Factor by which to reduce size of freq.
+                   OPTIONAL. Default=100.
+
+    Outputs:     
+                 (array float) Monochromatic Beam area [sr] at frequencies
+                    corresponding to freq
+
+    Calculation:
+      Generates sparse frequency array of full range
+      Uses spireMonoBeam to calculate monochromatic area of beam convolved with 
+        a source profile at sparse freqs
+      Interpolates to full frequency grid
+
+    Dependencies:
+      spireMonoBeam
+      herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
+      
+    2013/12/19  C. North  initial version
+
+    """
+
+    arcsec2Sr = (PI/(60.*60.*180))**2
+
+    #set up a sparser range of frequencies (otherwise it takes too long)
+    nNu=len(freq)
+    nNuArea=nNu/freqFact + 1
+    #array of indices of full frequency array to use
+    iNuArea=Int1d(range(nNuArea))*freqFact
+    iNuArea[-1]=nNu-1
+
+    #set up arrays
+    beamMonoFreqSparse=Double1d(nNuArea)
+    beamMonoAreaSparse=Double1d(nNuArea)
+
+    #get beam radius array from calibration table
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+    #get constant beam profile from calibration table
+    beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+
+    # calculate at sparse frequencies
+    for fx in range(nNuArea):
+        #get corresponding index in full frequency array
+        f=iNuArea[fx]
+        #populate frequency array
+        beamMonoFreqSparse[fx]=freq[f]
+        #populate beam area array
+        beamMonoAreaSparse[fx]=spireMonoBeamSrc(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array)
+
+    # interpolate to full frequency array and convert to Sr
+    beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
+    beamMonoArea=beamInterp(freq)*arcsec2Sr #in sr
+    
+    return(beamMonoArea)
 
 
 #-------------------------------------------------------------------------------
@@ -684,4 +697,3 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, UD=True, temp=20.0, beta=1.8, alph
 #=====                           END OF FUNCTIONS                          =====
 #===============================================================================
 #-------------------------------------------------------------------------------
-
