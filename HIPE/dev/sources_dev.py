@@ -18,6 +18,64 @@
 #
 #===============================================================================
 #
+# Classes:
+#   Source(type,params): a source type and parameters
+#   SourceProfile(radArr,profile): a radial source profile
+#   RftProfile(kArr,rftProfile): radial Fourier Transform of a source profile
+#
+# Other functions:
+#   calcJ0(z): calculate 0th order Bessel function J0(z)
+#   j0Arg(theta): calculate the argument used in integral of the J0 Bessel function
+#   rftArg(r): calculate the argument of the RFT integral
+#
+# Source Class:
+#   An object containing a parameterised source description
+#   Initialisation:
+#     Source(type,params): define source type based on source type and parameters
+#   Contains:
+#     type: source type (string): GAUSSIAN|POWERLAW|LINEAR|CONSTANT|LINCONST
+#     params: the parameters of the source type
+#     name: the name of the source type
+#     key: unique ID based on type and params
+#     availableTypes: dictionary of available types and default parameters
+#   Methods:
+#     check(): check type and params are correct, and use default params if necessary
+#     setKey(): set unique key
+#     calcProfile(radArr): produce SourceProfile object corresponding to radArr
+#     initAvailableTypes(): initialise the available source types
+#
+# SourceProfile Class:
+#   An object containing a source profile
+#   Initialisation:
+#     SourceProfile(): create empty object
+#     SourceProfile(radArr,profile): create object containing radArr, profile
+#   Contains:
+#     radArr: radius vector
+#     nRad: length of radius vector
+#     maxRad: max value of radArr
+#     profile: radial profile corresponding to radArr
+#   Methods:
+#     setRadArr(radArr): set radArr,nRad,maxRad
+#     generate(Source,radArr): calculate profile from Source corresponding to radArr
+#     rad2k: calculate k-space vector from radArr
+#     calcRft: produce RftProfile object from radArr, profile
+#
+# RftProfile Class:
+#   An object containing a radial Fourier transform of a source profile
+#   Initialisation:
+#     RftProfile(): create empty object
+#     RftProfile(kArr,rftProfile): create object containing kArr, rftProfile
+#   Contains:
+#     kArr: radius vector
+#     nK: length of kArr vector
+#     maxK: max value of kArr
+#     rftProfile: radial Fourier transform profile corresponding to kArr
+#   Methods:
+#     setKArr(kArr): set radArr,nRad,maxRad
+#     generate(Source,kArr): calculate radial Fourier transform profile from Source and kArr
+#     k2rad: calculate radius array from kArr
+#     calcInvRft: produce SourceProfile object from kArr, rftProfile
+#
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                      IMPORT HIPE & JAVA MODULES                     =====
@@ -38,65 +96,9 @@ from herschel.ia.numeric.toolbox import RealFunction
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator
 
-Sources={}
-
-def RFT(xIn,profIn):
-    #compute Radial-Fourier Transform (RFT) of source profile
-    xOut=rad2k(xIn)
-    nXOut=len(xOut)
-    profOut=Float1d(nXOut)
-    maxXIn=MAX(xIn)
-    integrator=TrapezoidalIntegrator(0.,maxXIn)
-    profInterp=CubicSplineInterpolator(xIn,profIn)
-    for x in range(nXOut):
-        RFTarg_x=RFTarg(xOut[x],profInterp)
-        profOut[x]=integrator.integrate(RFTarg_x)
-        print x,xOut[x],profOut[x]
-    return(xOut,profOut)
-    
-class RFTarg(RealFunction):
-    #returns J0(k*r) * radInt(r)
-    def __init__(self,k,radInt):
-        self.k=k
-        self.radInt=radInt
-    def calc(self,r):
-        return (calcJ0(self.k*r)*self.radInt(r))
-    
-
-def rad2k(radArr):
-    #given a radArr vector, calculate the appropriate k-space vector for RFT
-    kArr=Double1d(len(radArr))
-    nRad=len(radArr)
-    for k in range(len(kArr)-1):
-        #print k,radArr[(nRad-1)-k]
-        kArr[k+1]=2*PI/radArr[(nRad-1)-k]
-    return(kArr)
-    
-def calcJ0(z):
-    #calculate J0 Bessel function at value z (z=kR)
-    #J= (1/pi) * int_0^pi{cos(z cos(x)) dx}
-    integrator=TrapezoidalIntegrator(0.,PI)
-    Jarg_z=J0arg(z)
-    J0=integrator.integrate(Jarg_z) / PI
-    return(J0)
-    
-class J0arg(RealFunction):
-    #returns COS(z * COS(theta)) for use in Bessel functions
-    def __init__(self,z):
-        self.z=z
-    def calc(self,theta):
-        return COS(self.z*COS(theta))
-    
-def testJ0():
-    #make test arrays of 0th order Bessel functions
-    xarr=Float1d(range(0,2000))/100.
-    nX=len(xarr)
-    J0arr=Double1d(nX)
-    for x in range(nX):
-        J0arr[x]=calcJ0(xarr[x])
-    return(xarr,J0arr)
 
 class Source:
+    
     def __init__(self,srcTypeIn,paramsIn):
         #set available types
         self.initAvailableTypes()
@@ -106,7 +108,6 @@ class Source:
         self.params=paramsIn
         self.check(verbose=True)
         self.setKey()
-        self.save()
 
     def setKey(self):
         #set key of source
@@ -116,8 +117,8 @@ class Source:
         self.key=key
         return(key)
     
-    def save(self):
-        Sources[self.key]=self
+    #def save(self):
+    #    Sources[self.key]=self
         
     def check(self,verbose=False):
         typeNew=self.type[:8].upper()
@@ -272,10 +273,7 @@ class Source:
             for p in range(src['maxPar']):
                 print '    %d: %s (default=%g)'%(p,src['paramNames'][p],src['defaults'][p])
             print '-----'
-        
-    def __str__(self):
-        print
-        
+
 class SourceProfile:
     def __init__(self,radArr=None,profile=None):
 
@@ -283,7 +281,7 @@ class SourceProfile:
         self.profile=profile or None
 
     def setRadArr(self,radArr=None):
-        self.radArr=radArr of None
+        self.radArr=radArr or None
         if self.radArr:
             self.nRad=len(radArr)
             self.maxRad=MAX(radArr)
@@ -311,9 +309,9 @@ class SourceProfile:
         integrator=TrapezoidalIntegrator(0.,self.maxRad)
         profInterp=CubicSplineInterpolator(self.radArr,self.profile)
         for k in range(nK):
-            RftArg_k=RftArg(kArr[k],profInterp)
+            rftArg_k=rftArg(kArr[k],profInterp)
             print 'rftArg calculated:',k,kArr[k]
-            rftProfile[k]=integrator.integrate(RftArg_k)
+            rftProfile[k]=integrator.integrate(rftArg_k)
             print 'integral calculated:',rftProfile[k]
             #print k,kArr[k],rftProfile[k]
         return(RftProfile(kArr,rftProfile))
@@ -346,7 +344,7 @@ class RftProfile:
             radArr[r+1]=2*PI/self.kArr[(self.nK-1)-r]
         return(radArr)
         
-    def invRFT(self):
+    def calcInvRft(self):
         #compute Radial-Fourier Transform (RFT) of source profile
         #make k-array
         radArr=self.k2rad()
@@ -354,27 +352,36 @@ class RftProfile:
         integrator=TrapezoidalIntegrator(0.,self.maxK)
         rftInterp=CubicSplineInterpolator(self.kArr,self.rft)
         for r in range(self.nR):
-            profArg_x=RFTarg(self.radArr[r],rftInterp)
+            profArg_x=rftArg(self.radArr[r],rftInterp)
             realProfile[r]=integrator.integrate(profArg_x)
             print r,radArr[r],realProfile[r]
         return(radArr,realProfile)
+
+#def testJ0():
+#    #make test arrays of 0th order Bessel functions
+#    xarr=Float1d(range(0,2000))/100.
+#    nX=len(xarr)
+#    J0arr=Double1d(nX)
+#    for x in range(nX):
+#        J0arr[x]=calcJ0(xarr[x])
+#    return(xarr,J0arr)
+    
+class j0arg(RealFunction):
+    #returns COS(z * COS(theta)) for use in Bessel functions
+    def __init__(self,z):
+        self.z=z
+    def calc(self,theta):
+        return COS(self.z*COS(theta))        
 
 def calcJ0(z):
     #calculate J0 Bessel function at value z (z=kR)
     #J= (1/pi) * int_0^pi{cos(z cos(x)) dx}
     integrator=TrapezoidalIntegrator(0.,PI)
-    Jarg_z=J0arg(z)
-    J0=integrator.integrate(Jarg_z) / PI
-    return(J0)
+    j0Arg_z=j0arg(z)
+    j0=integrator.integrate(j0Arg_z) / PI
+    return(j0)
     
-class J0arg(RealFunction):
-    #returns COS(z * COS(theta)) for use in Bessel functions
-    def __init__(self,z):
-        self.z=z
-    def calc(self,theta):
-        return COS(self.z*COS(theta))
-    
-class RftArg(RealFunction):
+class rftArg(RealFunction):
     #returns J0(k*r) * radInt(r)
     def __init__(self,k,radInt):
         self.k=k
