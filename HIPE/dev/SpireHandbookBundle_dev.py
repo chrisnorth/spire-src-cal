@@ -73,7 +73,8 @@
 #         [float] conversion factor
 #
 #  * getCal:
-#     Gets calibration Context from pool or file, and/or checks existing cal
+#     Gets calibration Context from pool or file, and/or checks existing cal.
+#     If no inputs, reads from default pool (currently 'spire_cal_12_2')
 #     - Inputs:
 #         cal:     [SpireCal context] Calibration Tree (optional)
 #         calTree: [string] Name of calibration tree to read from HSA (optional)
