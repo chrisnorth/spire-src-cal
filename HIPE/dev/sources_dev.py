@@ -84,213 +84,536 @@
 
 import herschel
 from herschel.ia.numeric import Double1d,Float1d,Int1d
-from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos
+from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs
 FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
 EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
 COS=herschel.ia.numeric.toolbox.basic.Cos.PROCEDURE
 MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
 MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
+ABS=herschel.ia.numeric.toolbox.basic.Abs.FUNCTION
 from java.lang import Double,Float,String
 from java.lang.Math import PI
 from herschel.ia.numeric.toolbox import RealFunction
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator
 
-
-class Source:
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                          DEFINE Source CLASS                        =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+class Source(object):
     
-    def __init__(self,srcTypeIn,paramsIn):
+    def __init__(self,srcTypeIn,paramsIn=None,verbose=False):
         #set available types
         self.initAvailableTypes()
-
         #set variables
         self.type=srcTypeIn
-        self.params=paramsIn
-        self.check(verbose=True)
+        self.params=paramsIn or []
+        #check against available tmplates
+        self.check(verbose=verbose)
         self.setKey()
 
     def setKey(self):
-        #set key of source
+        #set unique key for source based on parameters
         key=self.type
         for par in self.params:
             key='%s_%g'%(key,par)
         self.key=key
         return(key)
     
-    #def save(self):
-    #    Sources[self.key]=self
-        
     def check(self,verbose=False):
+        #capitalise type and truncate to 8 letters
         typeNew=self.type[:8].upper()
         if typeNew != self.type:
-            print 'Converting to upper case and truncating: %s -> %s'%(self.type,typeNew)
-        print self.params
+            if (verbose):print 'Converting to upper case and truncating: %s -> %s'%(self.type,typeNew)
+            self.type=typeNew
+
+
+        #make sure parameters are in Double1d
         try:
             #see if len() works (doesn't work for scalars)
             len(self.params)
-            paramsIn=Double1d(self.params)
+            #turn into Double1d
+            self.params=Double1d(self.params)
         except:
             #convert scalar to 1-element Float1d
-            paramsIn=Double1d([self.params])
-        #find number of parameters
-        nParamIn=len(paramsIn)
-        print paramsIn
-        #check number of parameters against available Types
+            self.params=Double1d([self.params])
+
+        #set the typeTemplate (checks type and nParams are valid)
+        self.setTemplate(verbose=verbose)
+        
+        self.nParams=len(self.params)
+        
+    def setTemplate(self,verbose=False):
+        #set typeTemplate based on available SourceTypes
+        if not self.availableTypes:
+            #initialise available types
+            self.initAvailableTypes()
         srcFound=False
+        #loop over available types
         for typename in self.availableTypes:
             typex=self.availableTypes[typename]
-            if typeNew==typename[:8]:
+            if self.type==typex.type:
                 srcFound=True
-                maxParReq=typex['maxPar']
-                minParReq=typex['minPar']
-                assert nParamIn>=minParReq and nParamIn<=maxParReq,\
-                  '%s source must have %d--%d parameters. %d provided'%(typename,minParReq,maxParReq,nParamIn)
-                if (verbose):
-                    if nParamIn < maxParReq:
-                        print '%d parameters provided. Using %d defaults'%(nParamIn,maxParReq-nParamIn)
-                    else:
-                        print '%d parameters provided.'%(nParamIn)
-                        
-                self.type=typename
-                self.nParam=self.availableTypes[self.type]['maxPar']
-                self.defaults=self.availableTypes[self.type]['defaults']
-                self.paramNames=self.availableTypes[self.type]['paramNames']
-                self.typeDesc=self.availableTypes[self.type]['name']
-
+                self.typeTemplate=self.availableTypes[typename]
         #error if source not found
         assert srcFound,'Unknown source type: %s'%self.type
         
-        #fill in default parameters
-        paramsOut=Double1d(self.nParam)
-        for p in range(maxParReq):
-            if p <= nParamIn-1:
-                if Double.isNaN(paramsIn[p]):
-                    #use default value
-                    paramsOut[p] = self.defaults[p]
+        #set typeDesc
+        self.typeDesc=self.typeTemplate.desc
+        #check number of parameters is valid
+        self.checkNParams()
+
+        #apply default parameters from Template
+        self.applyTemplateDefaults(verbose=verbose)
+
+    def checkNParams(self):
+        #check number of parameters is valud
+        nParam=len(self.params)
+        validNParam= (nParam >= self.typeTemplate.minPar and nParam <= self.typeTemplate.maxPar)
+
+        assert (nParam >= self.typeTemplate.minPar),\
+          '%s source requires at least %d parameters'%(self.typeTemplate.name,self.typeTemplate.minPar)
+        assert (nParam <= self.typeTemplate.maxPar),\
+          '%s source has maximum %d parameters'%(self.typeTemplate.name,self.typeTemplate.maxPar)
+        return(validNParam)
+
+    def applyTemplateDefaults(self,verbose=False):
+        #apply default parameters from typeTemplate
+        
+        #get current number of parameters
+        nParamIn=len(self.params)
+        
+        #get total number of parameters
+        nParamOut=self.typeTemplate.maxPar
+        paramsOut=Double1d(nParamOut)
+        #loop over parameters
+        for p in range(nParamOut):
+            #if parameter is given
+            if p < nParamIn:
+                #parameter given
+                if Double.isNaN(self.params[p]):
+                    #if NaN use default value
+                    paramsOut[p] = self.typeTemplate.defaults[p]
                     if (verbose):print 'Using default value for "%s": %f'%\
-                        (self.paramNames[p],self.defaults[p])
+                        (self.typeTemplate.paramNames[p],paramsOut[p])
                 else:
                     #use provided value
-                    paramsOut[p] = paramsIn[p]
+                    paramsOut[p] = self.params[p]
             else:
                 #use default value
-                paramsOut[p] = self.defaults[p]
+                paramsOut[p] = self.typeTemplate.defaults[p]
                 if (verbose):print 'Using default value for "%s": %f'%\
-                    (self.paramNames[p],self.defaults[p])
+                    (self.typeTemplate.paramNames[p],paramsOut[p])
+        #set new params
         self.params=paramsOut
+        #set paramNames
+        self.paramNames=self.typeTemplate.paramNames
+        #update nParams
+        self.nParams=len(self.params)
+        #set zeroValue
+        self.zeroVal=self.typeTemplate.calcZeroVal(self.params)
+        #set scaleWidth
+        self.scaleWidth=self.typeTemplate.calcScaleWidth(self.params)
 
     def calcProfile(self,radArr):
-        if self.type=='GAUSSIAN':
-            #generate profile for Gaussian source
-            srcWidth=self.params[0]
-            srcPeak=self.params[1]
-        
-            srcProf=srcPeak * EXP(-radArr**2/(2.*srcWidth**2))
-            
-        elif self.type=='LINEAR':
-            #generate profile for Linear source
-            srcGrad=self.params[0]
-            srcZero=self.params[1]
-        
-            srcProf=srcZero + srcGrad * radArr
-            
-        elif self.type=='POWERLAW':
-            #generate profile for Power Law source
-            srcIdx=self.params[0]
-            srcScalRad=self.params[1]
-            srcMinRad=self.params[2]
-            srcValMinRad=self.params[3]
+        #run calcProfile associated with typeTemplate
+        srcProf=self.typeTemplate.calcProfile(radArr,self.params)
+        return(SourceProfile(radArr,srcProf,self))
 
-            srcProf=Double1d(len(radArr))
-            srcProf[radArr.where(radArr>=srcMinRad)]=(radArr[radArr.where(radArr>=srcMinRad)]/srcScalRad)**srcIdx
-            srcProf[radArr.where(radArr<srcMinRad)]=srcValMinRad
-            
-        elif self.type=='CONSTANT':
-            #generate profile for Constant source
-            
-            srcVal=self.params[0]
-            srcProf=Double1d(len(radArr),srcVal)
-            
-        elif self.type=='LINCONST':
-            #generate profile for Linear-Constant (linear with max and/or min limits)
-            srcGrad=self.params[0]
-            srcZero=self.params[1]
-            srcMin=self.params[2]
-            srcMax=self.params[3]
-        
-            srcProf=srcZero + srcGrad * radArr
-            if MAX(srcProf) > srcMax:
-                srcProf[srcProf.where(srcProf > srcMax)]=srcMax
-            if MIN(srcProf) < srcMin:
-                srcProf[srcProf.where(srcProf < srcMin)]=srcMin
-            
-        return(SourceProfile(radArr,srcProf))
-
+    def calcArea(self):
+        #run calcArea associated with typeTemplate
+        srcArea=self.typeTemplate.calcArea(self.params)
+        return(srcArea)
+    
     def initAvailableTypes(self):
         self.availableTypes={}
-        self.availableTypes["GAUSSIAN"]={
-          "name":"Gaussian",
-          'minPar':1,
-          'maxPar':2,
-          'paramNames':["Source width","Peak value"],
-          'defaults':[100.,1.0]}
-
-        self.availableTypes['LINEAR']={
-          "name":"Linear",
-          'minPar':1,
-          'maxPar':2,
-          'paramNames':["Gradiant","Value at r=0"],
-          'defaults':[-0.01,1.0]}
-        
-        self.availableTypes['POWERLAW']={
-          "name":"Power law",
-          'minPar':2,
-          'maxPar':4,
-          'paramNames':["Spectral index","Scale Radius","min radius to extend to","value below min radius"],
-          'defaults':[-1.,100.,1.e-3,Double.NaN]}
-            
-        self.availableTypes['CONSTANT']={
-          "name":"Constant",
-          'minPar':0,
-          'maxPar':1,
-          'paramNames':["Value"],
-          'defaults':[1.]}
-            
-        self.availableTypes['LINCONST']={
-          "name":"LinConst",
-          'minPar':1,
-          'maxPar':4,
-          'paramNames':["Gradiant","Value at r=0","Min Limit","Max Limit"],
-          'defaults':[-0.01,1.0, 0.,Double.POSITIVE_INFINITY]}
+        self.availableTypes["GAUSSIAN"]=GaussianSourceType()
+        self.availableTypes['LINEAR']=LinearSourceType()
+        self.availableTypes['POWERLAW']=PowerLawSourceType()
+        self.availableTypes['CONSTANT']=ConstantSourceType()
+        self.availableTypes['LINCONST']=LinConstSourceType()
 
     def listSrcTypes(self):
         #list all source types
         print '====\nSource Types\n===='
         for typeName in self.availableTypes:
-            src=self.availableTypes[typeName]
-            print '%s (%s):'%(typeName,src['name'])
-            print '  %d--%d parameters:'%(src['minPar'],src['maxPar'])
-            for p in range(src['maxPar']):
-                print '    %d: %s (default=%g)'%(p,src['paramNames'][p],src['defaults'][p])
+            print 'SourceType %s:'%(typeName)
+            print str(self.availableTypes[typeName])
             print '-----'
 
-class SourceProfile:
-    def __init__(self,radArr=None,profile=None):
+    def toString(self):
+        return(self.__str__())
+        
+    def __str__(self):
+        #print helpful string
+        result='%s'%self.__class__
+        result=result+'\nKey=%s'%(self.key)
+        result=result+"\nSourceType: %s (%s)"%(self.type,self.typeDesc)
+        result=result+"\nnParams: %d"%self.nParams
+        for p in range(self.nParams):
+            result=result+"\n  params[%d] (%s): %g"%(p,self.paramNames[p],self.params[p])
+        result=result+'\nscaleWidth=%g'%self.scaleWidth
+        result=result+'\nzeroVal=%g'%self.zeroVal
+        return(result)
+        
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                        DEFINE SourceType CLASSES                    =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+class SourceType(object):
+    def __init__(self,name=type,minPar=0,paramNames=None,defaults=None):
+        self.desc=type
+        self.minPar=0
+        self.paramNames=[]
+        self.defaults=[]
+        self.maxPar=0
+        if paramNames:
+            for p in range(len(paramNames)):
+                #first minPar are required, rest are not
+                if p<minPar:
+                    required=True
+                else:
+                    required=False
+                self.addParameter(paramNames[p],defaults[p],required=required)
+            
+    def addParameter(self,paramName,default,required=False):
+        print paramName,default,required
+        if required:
+            if self.minPar<self.maxPar:
+                print 'cannot make required parameter, as there are already non-required ones'
+            else:
+                self.minPar+=1
+        self.paramNames.append(paramName)
+        self.defaults.append(default)
+        self.maxPar=len(self.paramNames)
 
+    def calcArea(self,params=None):
+        print 'Warning: no analytical value for area of %s source'%self.type
+        return(Double.NaN)
+    
+    def __str__(self):
+        result=self.__class__
+        result="\nType name: %s"%self.desc
+        result=result+"\nParameters: %d (%d required)"%(self.maxPar,self.minPar)
+        for p in range(self.maxPar):
+            result=result+"\n  %d: %s (default %g)"%(p,self.paramNames[p],self.defaults[p])
+        return(result)
+        
+    
+class NoneSourceType:
+    def __init__(self):
+        self.type='NONE'
+        self.desc='NONE source type'
+        self.minPar=0
+        self.paramNames=[]
+        self.defaults=[]
+        self.maxPar=len(self.paramNames)
+        
+    def calcProfile(self,radArr,params):
+        return(Double1d(len(radArr),Double.NaN))
+        
+    def calcArea(self,params):
+        return(Double.NaN)
+        
+    def calcZeroVal(self,params):
+        return(Double.NaN)
+    
+    def calcScaleWidth(self,params):
+        return(Double.NaN)
+    
+class GaussianSourceType(SourceType):
+    def __init__(self):
+        self.type='GAUSSIAN'
+        self.desc='Gaussian profile'
+        self.minPar=1
+        self.paramNames=["Source width","Peak value"]
+        self.defaults=[100.,1.0]
+        self.maxPar=len(self.paramNames)
+    
+    def calcProfile(self,radArr,params):
+        srcWidth=params[0]
+        srcPeak=params[1]
+        srcProf=srcPeak * EXP(-radArr**2/(2.*srcWidth**2))
+        return(srcProf)
+        
+    def calcArea(self,params):
+        #integrate Gaussian
+        srcWidth=params[0]
+        srcPeak=params[1]
+        srcArea=srcPeak * 2*PI*srcWidth**2
+        return(srcArea)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[1]
+        return(zeroVal)
+        
+    def calcScaleWidth(self,params):
+        scaleWidth=params[0]
+        return(scaleWidth)
+
+class LinearSourceType(SourceType):
+    def __init__(self):
+        self.type='LINEAR'
+        self.desc='Linear profile'
+        self.minPar=1
+        self.paramNames=["Gradiant","Value at r=0"]
+        self.defaults=[-0.01,1.0]
+        self.maxPar=len(self.paramNames)
+        
+    def calcProfile(self,radArr,params):
+        print params
+        srcGrad=params[0]
+        srcZero=params[1]
+        srcProf=srcZero + srcGrad * radArr
+        return(srcProf)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[1]
+        return(zeroVal)
+        
+    def calcScaleWidth(self,params):
+        #calculate half-width-half-max
+        scaleWidth=ABS(params[1]/params[0])
+        return(scaleWidth)
+    
+class PowerLawSourceType(SourceType):
+    def __init__(self):
+        self.type='POWERLAW'
+        self.desc='Power law profile'
+        self.minPar=2
+        self.paramNames=["Spectral index","Scale Radius","min radius to extend to","value below min radius"]
+        self.defaults=[-1.,100.,1.e-3,Double.NaN]
+        self.maxPar=len(self.paramNames)
+        
+    def calcProfile(self,radArr,params):
+        srcIdx=params[0]
+        srcScalRad=params[1]
+        srcMinRad=params[2]
+        srcValMinRad=params[3]
+        srcProf=Double1d(len(radArr))
+        srcProf[radArr.where(radArr>=srcMinRad)]=(radArr[radArr.where(radArr>=srcMinRad)]/srcScalRad)**srcIdx
+        srcProf[radArr.where(radArr<srcMinRad)]=srcValMinRad
+        return(srcProf)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[3]
+        return(zeroVal)
+        
+    def calcScaleWidth(self,params):
+        #return scale radius
+        scaleWidth=params[1]
+        return(scaleWidth)
+        
+class ConstantSourceType(SourceType):
+    def __init__(self):
+        self.type='CONSTANT'
+        self.desc='Constant profile'
+        self.minPar=0
+        self.paramNames=["Value"]
+        self.defaults=[1.]
+        self.maxPar=len(self.paramNames)
+        
+    def calcProfile(self,radArr,params):
+        srcVal=params[0]
+        srcProf=Double1d(len(radArr),srcVal)
+        return(srcProf)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[0]
+        return(zeroVal)
+        
+    def calcScaleWidth(self,params):
+        #set as infinity
+        scaleWidth=Double.POSITIVE_INFINITY
+        return(scaleWidth)
+        
+class LinConstSourceType(SourceType):
+    def __init__(self):
+        self.type='LINCONST'
+        self.desc='Linear profile with limits'
+        self.minPar=1
+        self.paramNames=["Gradiant","Value at r=0","Min Limit","Max Limit"]
+        self.defaults=[-0.01,1.0, 0.,Double.POSITIVE_INFINITY]
+        self.maxPar=len(self.paramNames)
+        
+    def calcProfile(self,radArr,params):
+        srcGrad=params[0]
+        srcZero=params[1]
+        srcMin=params[2]
+        srcMax=params[3]
+        srcProf=srcZero + srcGrad * radArr
+        if MAX(srcProf) > srcMax:
+            srcProf[srcProf.where(srcProf > srcMax)]=srcMax
+        if MIN(srcProf) < srcMin:
+            srcProf[srcProf.where(srcProf < srcMin)]=srcMin
+        return(srcProf)
+        
+    def calcArea(self,params):
+        srcGrad=params[0]
+        srcZero=params[1]
+        srcMin=params[2]
+        srcMax=params[3]
+        if srcMin==0 and srcGrad<0:
+            #profile -> 0 at high r
+            srcArea=(PI/3)*srcZero**3/srcGrad**2
+            if srcMax < srcZero:
+                #account for central region being uniform
+                srcArea=srcArea - (PI/3)*(srcZero-srcMax)**3/srcGrad**2
+        else:
+            #no analytical solution
+            print 'Warning: no analytical value for area of LINCONST source'
+            srcArea=Double.NaN
+            
+        return(srcArea)
+            
+    def calcZeroVal(self,params):
+        zeroVal=params[1]
+        if zeroVal < params[2]: zeroVal=params[2]
+        if zeroVal > params[3]: zeroVal=params[3]
+        
+    def calcScaleWidth(self,params):
+        #calculate half-width-half-max
+        if params[0] < 0:
+            scaleWidth=(params[1]-params[2])/params[0]
+        else:
+            scaleWidth=(params[3]-params[1])/params[0]
+        return(scaleWidth)
+    
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                       DEFINE SourceProfile CLASS                    =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+class SourceProfile(object):
+    def __init__(self,radArr=None,profile=None,originator=None):
+        #set radArr
         self.setRadArr(radArr)
+        #set profile
         self.profile=profile or None
+        #check radArr and profile are compatible
+        self.check()
+        #set original Source object
+        self.setOrig(originator)
 
     def setRadArr(self,radArr=None):
+        #set radArr, nRad and maxRad
         self.radArr=radArr or None
         if self.radArr:
             self.nRad=len(radArr)
             self.maxRad=MAX(radArr)
+        else:
+            self.nRad=0
+            self.maxRad=Double.NaN
 
+    def check(self):
+        #check radArr and profile are both/neither None
+        #check both same length
+        if self.radArr==None:
+            assert (self.profile==None),\
+              'must set both radArr and profile, or neither'
+        else:
+            assert (self.profile!=None),\
+              'must set both radArr and profile, or neither'
+            assert len(self.radArr)==len(self.profile),\
+              'radArr and profile must be of same lengths'%(len(radArr),len(profile))
+
+    def copy(self):
+        new=SourceProfile(radArr=self.radArr,profile=self.profile,originator=self.origSrc)
+        return(new)
+        
     def generate(self,src,radArr):
         #generate from Source object
-        self.radArr=radArr
-        self.profile = src.calcProfile(radArr)
-    
+        self.setradArr(radArr)
+        self.profile=src.calcProfile(radArr)
+        self.setOrig(src)
+
+    def setOrig(self,src):
+        if src:
+            self.fromSrc=True
+            self.origSrc=src
+        else:
+            self.fromSrc=False
+            self.origSrc=NoneSourceType()
+                        
+    def calcArea(self,forceNumerical=False,forceAnalytical=False):
+        if forceNumerical:
+            doNum=True
+        elif forceAnalytical:
+            doNum=False
+            if self.fromSrc:
+                srcArea=self.origSrc.calcArea()
+            else:
+                srcArea=Double.NaN()
+        else:
+            if self.fromSrc:
+                #try to get analytical area from origSrc
+                srcArea=self.origSrc.calcArea()
+                if Double.isNaN(srcArea):
+                    doNum=True
+                else:
+                    doNum=False
+            else:
+                 doNum=True
+
+        if doNum:
+            #calculate area numerically
+            profInterp=CubicSplineInterpolator(self.radArr,2.*PI*self.radArr*self.profile)
+            integrator=TrapezoidalIntegrator(0,self.maxRad)
+            srcArea=integrator.integrate(profInterp)
+            
+        return(srcArea)
+        
+    def add(self,prof2):
+        #add profile to another
+        
+        #check whether prof2 is scalar of array
+        try:
+            #len doesn't work on scalar
+            len(prof2)
+            isScal=False
+        except:
+            isScal=True
+        
+        if not isScal:
+            #check vector lengths
+            assert len(prof2)==len(self.profile),\
+              'Added profile must scalar of of same length as SourceProfile'
+        
+        #multiply profiles
+        self.profile = self.profile + prof2
+        #no longer based on SourceType
+        self.origSrc=NoneSourceType()
+        self.fromSrc=False
+        
+        return(self)
+        
+    def mult(self,prof2):
+        #multiply profile by another
+        
+        #check whether prof2 is scalar of array
+        try:
+            #len doesn't work on scalar
+            len(prof2)
+            isScal=False
+        except:
+            isScal=True
+        
+        if not isScal:
+            #check vector lengths
+            assert len(prof2)==len(self.profile),\
+              'Multiplied profile must scalar of of same length as SourceProfile'
+        
+        #multiply profiles
+        self.profile = self.profile * prof2
+        #no longer based on SourceType
+        self.origSrc=NoneSourceType()
+        self.fromSrc=False
+        
+        return(self)
+
     def rad2k(self):
         #make k-array
         kArr=Double1d(self.nRad)
@@ -315,8 +638,29 @@ class SourceProfile:
             print 'integral calculated:',rftProfile[k]
             #print k,kArr[k],rftProfile[k]
         return(RftProfile(kArr,rftProfile))
+        
+    def __str__(self):
+        result='%s'%self.__class__
+        result=result+'\nnRad=%d'%self.nRad
+        if self.nRad > 0:
+            result=result+'\nmaxRad=%g'%self.maxRad
+            if self.nRad<=5:
+                result=result+'\nradArr: '+self.radArr
+                result=result+'\nprofile: '+self.profile
+            else:
+                result=result+'\nradArr: [%g, %g, ... %g, %g]'%(self.radArr[0],self.radArr[1],self.radArr[-2],self.radArr[-1])
+                result=result+'\nprofile: [%g, %g, ... %g, %g]'%(self.profile[0],self.profile[1],self.profile[-2],self.profile[-1])
+            result=result+'\nfromSrc: %r'%self.fromSrc
+            if self.fromSrc:
+                result=result+'\norigSrc: %s'%self.origSrc.key
+        return(result)
 
-class RftProfile:
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                       DEFINE RftProfile CLASS                     =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+class RftProfile(object):
     def __init__(self,kArr=None,rtfProfile=None):
         self.setKArr(kArr)
         self.rft=rftProfile or None

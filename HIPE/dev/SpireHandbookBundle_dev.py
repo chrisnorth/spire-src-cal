@@ -887,7 +887,7 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
     h = Constant.H_PLANCK.value
     k = Constant.K_BOLTZMANN.value
     c = Constant.SPEED_OF_LIGHT.value
-    print 'freq',freq0,freq[1],transm[1]
+
     #
     # Calculate sky background model
     #

@@ -18,6 +18,7 @@
 
 import herschel
 from herschel.ia.numeric import Double1d,Float1d,Int1d
+from java.lang import Double
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator,LinearInterpolator
 from java.lang.Math import PI
@@ -613,18 +614,32 @@ def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,arr
     isConst=beamNew.where(beamNew < beamConst)
     beamNew[isConst]=beamConst[isConst]
 
-    #multiply by source Profile
-    beamNew = beamNew*srcProf.profile
+    #copy source Profile and multiply by beam
+    beamNew = srcProf.copy().mult(beamNew)
+    beamMonoArea = beamNew.calcArea()
+    
+    if beamMonoArea==0:
+        print 'calculated area=0'
+        #try just the source
+        srcArea=srcProf.calcArea(forceAnalytical=True)
+        if Double.isNaN(srcArea):
+            #no analytical source
+            print 'Source is very small. No analytical area for source'
+        else:
+            print 'Source is very small. Replacing area with analytical area of source'
+            beamMonoArea=srcArea
+
 
     ## THIS IS ONLY VALID FOR AREA
     ## FULL PROFILE OF CONVOLUTION REQUIRES PROPER CONVOLUTION
 
     #integrate to get solid angle (in arcsec^2)    
-    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
-    integrator=TrapezoidalIntegrator(0,maxRad)
-    beamMonoArea=integrator.integrate(beamInterp)
+    #beamNew=beamNew * srcProf.profile
+    #beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    #integrator=TrapezoidalIntegrator(0,maxRad)
+    #beamMonoArea=integrator.integrate(beamInterp)
 
-    return (beamMonoArea)
+    return (beamMonoArea,beamNew.profile)
 
 #-------------------------------------------------------------------------------
 # Calculate monochromatic beam areas over a range of frequencies
@@ -691,7 +706,7 @@ def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
         #populate frequency array
         beamMonoFreqSparse[fx]=freq[f]
         #populate beam area array
-        beamMonoAreaSparse[fx]=spireMonoBeamSrc(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array)
+        beamMonoAreaSparse[fx]=spireMonoBeamSrc(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array)[0]
 
     # interpolate to full frequency array and convert to Sr
     beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
