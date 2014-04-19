@@ -156,6 +156,7 @@ def calcBeamSrcMonoArea(src,verbose=False):
     return beamMonoSrcArea[src.key]
 
 def fineBeam(beamProfsIn,scaleWidth,verbose=False):
+    #adjust sampling of fineBeam according to scaleWidth
     beamRadIn=beamProfsIn.getCoreCorrectionTable().getColumn('radius').data
 
     iFine=11
@@ -203,83 +204,7 @@ def fineBeam(beamProfsIn,scaleWidth,verbose=False):
         beamProfs=beamProfsIn
         
     return(beamProfs)
-    
-def testBeamSrcMono(src,verbose=False):
 
-    beamProfsIn = sh.getCal().getProduct("RadialCorrBeam")
-    beamRadIn=beamProfsIn.getCoreCorrectionTable().getColumn('radius').data
-
-    iFine=11
-    if src.scaleWidth < beamRadIn[iFine]:
-        #source scale Width is smaller than 10 beamRad steps
-        #add finely-sampled region of profile
-        #get coarse part of array
-        radArrCoarse=beamRadIn[iFine+1:]
-        #generate fine part of array
-        maxRadFine=beamRadIn[iFine]
-        radFineStep=src.scaleWidth/10
-        nRadFine=int(maxRadFine/radFineStep)
-        radArrFine=Double1d().range(nRadFine)
-        radArrFine=radArrFine*radFineStep
-        
-        #concatenate arrays
-        beamRad=radArrFine
-        beamRad.append(radArrCoarse)
-
-        #interpolate beamProfs
-        beamProfs=beamProfsIn.copy()
-        beamProfs.getCoreCorrectionTable().getColumn('radius').data=beamRad
-        beamProfs.getConstantCorrectionTable().getColumn('radius').data=beamRad
-        beamProfs.getNormAreaCorrectionTable().getColumn('radius').data=beamRad
-        for band in spireBands():
-            #get input arrays
-            beamCoreIn=beamProfsIn.getCoreCorrectionTable().getColumn(band).data
-            beamConstIn=beamProfsIn.getConstantCorrectionTable().getColumn(band).data
-            beamNormIn=beamProfsIn.getNormAreaCorrectionTable().getColumn(band).data
-            #make interpolation objects
-            beamCoreInterp=CubicSplineInterpolator(beamRadIn,beamCoreIn)
-            beamConstInterp=CubicSplineInterpolator(beamRadIn,beamConstIn)
-            beamNormInterp=CubicSplineInterpolator(beamRadIn,Double1d(beamNormIn))
-            #do interpolation
-            beamCoreNew=beamCoreInterp(beamRad)
-            beamConstNew=beamConstInterp(beamRad)
-            beamNormNew=beamNormInterp(beamRad)
-            #replace profile arrays
-            beamProfs.getCoreCorrectionTable().getColumn(band).data=beamCoreNew
-            beamProfs.getConstantCorrectionTable().getColumn(band).data=beamConstNew
-            beamProfs.getNormAreaCorrectionTable().getColumn(band).data=beamNormNew
-    else:
-        #get original RadialBeamCorr product
-        beamProfs=beamProfsIn
-            
-    #get beamRad from beamProfs
-    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-    print beamRad
-
-    #define srcProf to be same length as beamRad
-
-    srcProf=src.calcProfile(beamRad)
-    
-    gamma = beamProfs.meta['gamma'].double
-    beamMonoSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    beamMonoSrcProf = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    beamMonoProf = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    beamMonoArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-    spireRefFreq=sh.getSpireRefFreq()
-    spireEffFreq=sh.getSpireEffFreq()
-    for band in spireBands():
-        if (verbose):print 'Calculating monochromatic beam areas for %s source for %s band'%(src.key,band)
-        beamConst=beamProfs.getConstantCorrectionTable().getColumn(band).data
-        resultBeam=beam.spireMonoBeam(spireRefFreq[band],beamRad,beamProfs,beamConst,spireEffFreq[band],gamma,band)
-        resultBeamSrc=beam.spireMonoBeamSrc(spireRefFreq[band],beamRad,beamProfs,beamConst,spireEffFreq[band],gamma,srcProf,band)
-        beamMonoArea[band]=resultBeam[0]
-        beamMonoProf[band]=resultBeam[1]
-        beamMonoSrcArea[band]=resultBeamSrc[0]
-        beamMonoSrcProf[band]=resultBeamSrc[1]
-    print beamMonoArea
-    print beamMonoSrcArea
-    return(beamMonoSrcArea,beamRad,beamMonoProf,beamMonoSrcProf,srcProf.profile)
-        
 def calcKColPSrc(alphaK,src,verbose=False,table=False):
     #-----------------------------------------------------------------------
     #print '\nCalculating extended source colour correction parameters over alpha...'
