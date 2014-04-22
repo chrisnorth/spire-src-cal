@@ -303,8 +303,8 @@ import os
 import herschel
 from herschel.ia.numeric import Double1d,Float1d,Int1d
 from herschel.spire.ia.cal import SpireCalTask
-from herschel.ia.dataset import TableDataset,DoubleParameter,Column
 spireCal = SpireCalTask()
+from herschel.ia.dataset import TableDataset,DoubleParameter,Column
 from herschel.ia.numeric.toolbox.interp import LinearInterpolator,CubicSplineInterpolator
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from java.lang.Math import PI
@@ -355,13 +355,67 @@ MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 #-------------------------------------------------------------------------------
 
 def spireBands():
-    bands=['PSW','PMW','PLW']
-    return(bands)
+    """
+    ========================================================================
+    spireBands():
+        Return list of bands for addessing dicts: ["PSW","PMW",PLW"]
+        
+    Inputs:
+        NONE
+        
+    Outputs:
+        (string list) list of beam names
+        
+    Calculation:
+        ['PSW','PMW','PLW']
+    """
+    return(['PSW','PMW','PLW'])
+
 def arcsec2Sr():
-    arcsec2Sr = (PI/(60.*60.*180))**2
-    return(arcsec2Sr)
+    """
+    ========================================================================
+    arcsec2Sr():
+        Calculate conversion from square arcsec to steradians (PI/(180*3600))^2
+    Inputs:
+        NONE
+    Outputs:
+        (double) conversion from square arcsec to steradians
+        
+    Calculation:
+        conversion is (PI/(180*3600))^2
+    """
+    return((PI/(60.*60.*180))**2)
     
 def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
+    """
+    ========================================================================
+    getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
+        Read photometer Calibration tree from appropriate input
+        Stored in global variable spireCalPhot so only read once
+
+    Inputs:
+        cal:     (SpireCal Context) calibration tree to extract photometer tree
+                 from. Default=None
+        calTree: (string) name of cal tree to read from HSA. Default=None
+        calPool: (string) name of pool to read cal tree from. Default=None
+        calFile: (string) filename to read cal tree from. Default=None
+        verbose: (boolean) Print extra information. Default=False
+    Outputs:
+        (PhotCal Context) reference frequencies in Hz (one per band)
+                    
+    Calculation:
+        If spireCalPhot already defined, check it is valid and return
+        If not, and no inputs defined, try to read from local pool "spire_cal_12_2"
+        If that fails, try in the following order:
+            If cal set, extract PhotCalContext from there
+            If calTree set, read from HSA calibration tree
+            If calPool set, read from local pool
+            If calFile set, read from jar file
+        Check spireCalPhot is a valie PhotCalContext
+    
+    Dependencies:
+        herschel.spire.ia.cal.SpireCalTask
+    """
     # if cal not defined, read from pool or jarFile
     # if cal is defined, don't read anything new. Just check and return cal
     #print cal,calTree,calPool,calFile,verbose
@@ -377,7 +431,7 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
         if cal==None and calTree==None and calPool==None and calFile==None:
             #no import provided. do default action
             defaultPool='spire_cal_12_2'
-            print 'Reading from default pool: %s'%defaultPool
+            if (verbose):print 'Reading from default pool: %s'%defaultPool
             cal=spireCal(pool=defaultPool)
         try:
             #try getting from cal
@@ -414,6 +468,24 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
     return(spireCalPhot)
     
 def getSpireFreq():
+    """
+    ========================================================================
+    getSpireFreq():
+        Calculate spire frequencies raster covering all bands
+        Stored in global variable spireFreq so only calculated once
+
+    Inputs:
+      NONE
+    Outputs:
+        (double array) reference frequencies in Hz (one per band)
+                    
+    Calculation:
+        Calculates frequency raster in Hz from 300-1800 GHz, with 0.1GHz step
+        That range covers all three SPIRE bands, and the 545/857 GHz Planck bands
+    
+    Dependencies:
+        herschel.ia.numeric.toolbox.basic.Floor
+    """
     # Frequency raster of common frequency grid spanning all three spire bands
 
     #define global variable
@@ -432,6 +504,24 @@ def getSpireFreq():
     return(spireFreq)
     
 def getSpireRefFreq():
+    """
+    ========================================================================
+    getSpireRefFreq():
+        Calculate spire reference frequencies for each band
+        Stored in global variable spireRefFreq so only calculated once
+
+    Inputs:
+      NONE
+    Outputs:
+        (double dict) reference frequencies in Hz (one per band)
+                    
+    Calculation:
+        Calculates frequencies corresponding to 250, 350, 500 micron
+    
+    Dependencies:
+        spireBands() - get list of spire bands
+        herschel.share.unit.Constant.SPEED_OF_LIGHT
+    """
 
     #define global variable
     global spireRefFreq #spire reference frequencies (at 250, 350, 500 microns)
@@ -450,8 +540,23 @@ def getSpireRefFreq():
 
 
 def getSpireEffFreq():
-    #get SPIRE Effective Frequencies from metadata
+    """
+    ========================================================================
+    getSpireEffFreq():
+        Retrieve spire effective frequencies from calibration tree
+        Stored in global variable spireEffFreq so only retrieved once
 
+    Inputs:
+      NONE
+    Outputs:
+        (double dict) effective frequencies in Hz (one per band)
+                    
+    Calculation:
+        Retrieves metadata freqEffPxw from RadialCorrBeam
+    
+    Dependencies:
+        getCal() - retrieve calibration tree
+    """
     #define global variable
     global spireEffFreq #spire Effective frequencies
 
@@ -468,7 +573,45 @@ def getSpireEffFreq():
     return(spireEffFreq)
 
 def getSpireFilt(rsrfOnly=False):
-    
+    """
+    ========================================================================
+    getSpireFilt(rsrfOnly=False):
+        Retrieve spire filter profiles from calibration tree (with/without aperture
+        efficiency) and interpolated to frequency raster from getSpireFreq()
+        Stored in global spireFilt and spireFiltOnly so only calculated once
+        Store filter only in global variable spireFiltOnly
+        Store filter*apertureefficiency in global variable spireFilt
+
+    Inputs:
+      rsrfOnly:   (boolean) set to retrieve spire filter profiles without
+                      aperture efficiency. Default=False (include ap. eff.)
+    Outputs:
+        (float array) Filter profile over frequency raster
+           [if rsrfOnly==True: RSRF only, else RSRF*Ap.Eff]
+                    
+    Calculation:
+      + If rsrfOnly=True
+        + If global variable spireFiltOnly exists, return that
+        + If not:
+          - Retrieves photometer calibration product (using getCal())
+          - Retrieves filter profile from calibration
+          - Retrieves the SPIRE frequency raster (using getSpireFreq())
+          - Interpolates filter to frequency raster
+      + If rsrfOnly=False
+        + If global variable spireFilt exists, return that
+        + If not:
+          - Retrieves photometer calibration product (using getCal())
+          - Retrieves filter profile and aperture efficiency from calibration
+          - Retrieves the SPIRE frequency raster (using getSpireFreq())
+          - Interpolates filter and ap.eff to frequency raster and multiplies
+
+    Dependencies:
+        spireBands() - get list of spire bands
+        getCal() - retrieve photometer calibration product
+        getSpireFreq() - retrieve frequency raster
+        herschel.ia.numeric.toolbox.interp.LinearInterpolator
+    """
+
     #define global variables
     global spireFiltOnly #spire filter profiles (without ap. eff.) over spireFreq
     global spireFilt #spire filter profiles (with ap. eff.) over spireFreq
@@ -480,7 +623,7 @@ def getSpireFilt(rsrfOnly=False):
         #spireFiltOnly not defined, so must calculate
 
         #check spireCalPhot exists
-        #spireCalPhot=getCal()
+        spireCalPhot=getCal()
         assert spireCalPhot.isValid(), 'Invalid SPIRE Photometer calibration tree. Run getCal()'
 
         #read RSRF and Aperture Efficiency from calibration tree
@@ -539,8 +682,46 @@ def getSpireFilt(rsrfOnly=False):
         return(spireFilt)
 
 def calcBeamMonoArea(beamType=None,verbose=False):
-    #calculate monochromatic beam areas using full or simple beam treatment
-    #print '\nCalculating monochromatic beam areas...'
+    """
+    ========================================================================
+    calcBeamMonoArea(beamType=None,verbose=False):
+        Retrieve the monochromatic beam areas across frequency raster, using either
+          simple beam treatment or full beam treatment
+        Stored in global variable beamMonoArea, so only calculated once, providing
+          beamType matches previously calculated version
+
+    Inputs:
+      beamType:   (string) type of beam calculate (None|'full'|'simple').
+                    Default=None (i.e. use existing, or 'full' if recalculating)
+      verbose:    (boolean) print more information. Default=False
+
+    Outputs:     
+      (dict) Monochromatic beam areas over frequency raster.
+        [one float array per band, plus beamType='full'|'simple']
+        
+    Calculation:
+      [See Handbook Eq 5.32/5.36]
+      + If global variable beamMonoArea exists, and beamType matches (or None),
+          returns previosly calculated version
+      + If not:
+          - Retrieves photometer calibration product (using getCal())
+          - Extracts radial beam profile
+          - Retrieves the SPIRE frequency raster (using getSpireFreq())
+          - Retrieves the SPIRE effective frequencies (using getSpireEffFreq())
+          + If beamType=simple:
+              [See Handbook Eq 5.36]
+              - Retrieves Neptune beam areas and scales with frequency
+          + If beamType=full of None:
+              [See Handbook Eq 5.32]
+              - Calculates beam area using full treatment over frequency raster
+
+    Dependencies:
+        spireBands() - get list of spire bands
+        getCal() - retrieve photometer calibration product
+        getSpireFreq() - retrieve frequency raster
+        getSpireEffFreq() - retrieve effective frequencies
+        spireMonoAreas() - calculate monochromatic beam areas (full treatment)
+    """
 
     #define global variables
     global beamMonoArea #monochromatic beam areas over spireFreq
@@ -572,7 +753,7 @@ def calcBeamMonoArea(beamType=None,verbose=False):
     if recalc or docalc:
 
         #recalculate beam profiles
-        beamProfs = spireCalPhot.getProduct("RadialCorrBeam")
+        beamProfs = getCal().getProduct("RadialCorrBeam")
         gamma = beamProfs.meta['gamma'].double
         beamMonoArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
 
@@ -610,7 +791,8 @@ def calcBeamMonoArea(beamType=None,verbose=False):
 def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1.0):
     """
     ========================================================================
-    Calculate the effective beam area for a source of a given spectrum
+    spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1.0):
+        Calculate the effective beam area for a source of a given spectrum
 
     Inputs:
       freq:       (array float) frequency vector corresponding to RSRF values [Hz]
@@ -677,8 +859,9 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
     """
     ========================================================================
-    Implements the full beam model to generate the monochromatic beam profile
-    and corresponding monochromatic beam solid angle at a given frequency.
+    spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
+        Implements the full beam model to generate the monochromatic beam profile
+        and corresponding monochromatic beam solid angle at a given frequency.
 
     Inputs:
       freqx:     (float) frequency [Hz] for which monochromatic beam
@@ -698,6 +881,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
       [1]:       (array float) Monochromatic beam profile at frequency freqx
 
     Calculation:
+        [See Handbook Eq 5.32]
           Scales the core beam profile width as (freqx/effFreq)^gamma.
       Queries the calibration file to generate new core beam profile.
       Uses constant beam profile where it is larger than core profile.
@@ -728,7 +912,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 
     #integrate to get solid angle (in arcsec^2)
     
-    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    beamInterp=CubicSplineInterpolator(beamRad,beamNew * 2. * PI * beamRad)
     integrator=TrapezoidalIntegrator(0,maxRad)
     beamMonoArea=integrator.integrate(beamInterp)
 
@@ -740,8 +924,9 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
     """
     ========================================================================
-    Generates array of monochromatic beam areas over frequency range by
-    calculating over a sparser array and interpolating
+    spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
+        Generates array of monochromatic beam areas over frequency range by
+        calculating over a sparser array and interpolating
 
     Inputs:
       freq:      (array float) frequency vector [Hz] for which monochromatic
@@ -817,9 +1002,9 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
   ext=False, monoArea=None):
     """
     ================================================================================
-    Calculation of the K-correction factor from isophotal flux to a monochromatic 
-    flux-density at a given reference frequency (data to be multiplied!)
-    This routine is needed by hpXcalColorCorr.py
+    calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0, ext=False, monoArea=None):
+        Calculation of the K-correction factor from isophotal flux to a monochromatic 
+          flux-density at a given reference frequency (data to be multiplied!)
     
     Inputs:
       freq0:     (float) waveband reference frequency [Hz] for which monochromatic
@@ -935,6 +1120,38 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
 #-------------------------------------------------------------------------------
 
 def calcOmegaEff(alphaK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcOmegaEff(alphaK,verbose=False,table=False):
+        Calculated effective beam area for power law spectrum
+
+    Inputs:
+        alphaK:  (scalar/float array) Spectral index(es) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) effective areas in arcsec^2 (one scalar/list per band,
+              depending on whether alphaK is scalar/list)
+        If table==True:
+            (TableDataset) effective areas in arcsec^2 (one column per band,
+              one row per alphaK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.32-34]
+        Integrates monochromatic beam areas over frequency raster, weighted by
+          spire filter profiles and source spectrum
+        If table is set, returns a TableDataset
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        getSpireFreq() - get frequency raster
+        getCal() - retrieve calibration tree
+        getSpireFilt() - get spire Filter profiles
+        calcBeamMonoArea() - calculate monochromatic beam areas
+        spireEffArea - calculate effective beam area
+        herschel.ia.dataset.TableDataset()
+    """
     # calculate effective beam area for power law spectrum
 
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -978,7 +1195,38 @@ def calcOmegaEff(alphaK,verbose=False,table=False):
 
 
 def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
-    # calculate effective beam area for modified BB spectrum
+    """
+    ================================================================================
+    calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
+        Calculated effective beam area for modified black-body spectrum
+
+    Inputs:
+        betaK:  (float) Emmisivity index to use
+        tempK:  (scalar/float array) Temperature(s) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) effective areas in arcsec^2 (one scalar/list per band,
+              depending on whether tempK is scalar/list)
+        If table==True:
+            (TableDataset) effective areas in arcsec^2 (one column per band,
+              one row per tempK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.32-34]
+        Integrates monochromatic beam areas over frequency raster, weighted by
+          spire filter profiles and source spectrum
+        If table is set, returns TableDataset (with betaK in metadata)
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        getSpireFreq() - get frequency raster
+        getCal() - retrieve calibration tree
+        getSpireFilt() - get spire Filter profiles
+        calcBeamMonoArea() - calculate monochromatic beam areas
+        herschel.ia.dataset.TableDataset()
+    """    # calculate effective beam area for modified BB spectrum
     # allows multiple temperatures, but only one beta value
 
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1024,6 +1272,35 @@ def calcOmegaEff_BB(betaK,tempK,verbose=False,table=False):
         return(beamAreaBB_table)
        
 def calcKBeam(alphaK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKBeam(alphaK,verbose=False,table=False):
+        Calculated beam correction factor for power law spectrum
+
+    Inputs:
+        alphaK:  (scalar/float array) Spectral index(es) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) beam correction factor (one scalar/list per band,
+              depending on whether alphaK is scalar/list)
+        If table==True:
+            (TableDataset) beam correction factor (one column per band,
+              one row per alphaK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.32-39]
+        Calculates effective area for pipeline (alpha=-1)
+        Calculates effective beam area for input spectrum(s)
+        KBeam(spectrum) = Omega_pipeline / Omega(spectrum)
+        If table is set, returns a TableDataset
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcOmegaEff() - calculate effective beam area
+        herschel.ia.dataset.TableDataset()
+    """
     # Calculate pipeline colour correction parameters
     # cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     try:
@@ -1065,6 +1342,37 @@ def calcKBeam(alphaK,verbose=False,table=False):
         return kBeam_table
 #
 def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKBeam_BB(betaK,tempK,verbose=False,table=False):
+        Calculated beam correction factor for modified black body spectrum
+
+    Inputs:
+        betaK:  (float) Emmisivity index to use
+        tempK:  (scalar/float array) Temperature(s) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) beam correction factor (one scalar/list per band,
+              depending on whether tempK is scalar/list)
+        If table==True:
+            (TableDataset) beam correction factor (one column per band,
+              one row per tempK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.32-39]
+        Calculates effective area for pipeline (alpha=-1)
+        Calculates effective beam area for input spectrum(s)
+        KBeam(spectrum) = Omega_pipeline / Omega(spectrum)
+        If table is set, returns a TableDataset (betaK in metadata)
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcOmegaEff() - calculate effective beam area for power law spectrum
+        calcOmegaEff_BB() - calculate effective beam area for mod-BB spectrum
+        herschel.ia.dataset.TableDataset()
+    """
     # Calculate pipeline colour correction parameters
     # allows multiple temperatures, but only one beta value
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1114,6 +1422,29 @@ def calcKBeam_BB(betaK,tempK,verbose=False,table=False):
 #-----------------------------------------------------------------------
 # Calculate pipeline colour correction parameters
 def calcK4P():
+    """
+    ================================================================================
+    calcK4P():
+        Calculated point souce K4 parameter for pipeline spectrum
+
+    Inputs:
+        NONE
+
+    Outputs:
+        (dict double) pipeline point source K4P parameter (one per band)
+                    
+    Calculation:
+        [See Handbook Eq 5.16]
+        Calculates point source K4P parameter for pipeline spectrum (alpha=-1)
+    
+    Dependencies:
+        getCal() - retrieve spire photometer calibration context
+        spireBands() - list of spire bands
+        getSpireFreq() - get frequency raster
+        getSpireRefFreq() - get spire reference frequencies
+        getSpireFilt() - get spirefilter profiles
+        calcSpireKcorr() - calculate colour correction factor
+    """
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
@@ -1126,6 +1457,34 @@ def calcK4P():
     return k4P
     
 def calcKMonE():
+    """
+    ================================================================================
+    calcKMonE():
+        Calculated fully- extended source KMonE conversion for pipeline spectrum
+
+    Inputs:
+        NONE
+
+    Outputs:
+        (dict double) KMonE conversion for pipeline spectrum (one per band)
+                    
+    Calculation:
+        [See Handbook Eq 5.20]
+        Calculates fully-extended source KMonE parameter for pipeline spectrum
+          (alpha=-1
+        KMonE converts broadband RSRF-weighted point source flux density to
+          monochromatic fully-extended source surface brightness at reference
+          frequencies.
+    
+    Dependencies:
+        getCal() - retrieve spire photometer calibration context
+        spireBands() - list of spire bands
+        getSpireFreq() - get frequency raster
+        getSpireRefFreq() - get spire reference frequencies
+        getSpireFilt() - get spirefilter profiles
+        calcBeamMonoArea() - calculate monochromatic beam areas
+        calcSpireKcorr() - calculate spire flux conversion factor
+    """
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal=cal)
@@ -1139,6 +1498,32 @@ def calcKMonE():
     return kMonE
 
 def calcK4E():
+    """
+    ================================================================================
+    calcK4E():
+        Calculated fully- extended source K4E conversion for pipeline spectrum
+
+    Inputs:
+        NONE
+
+    Outputs:
+        (dict double) K4E conversion for pipeline spectrum (one per band)
+                    
+    Calculation:
+        [See Handbook Eq 5.23]
+        Calculate KMonE conversion
+        Calculate effective beam area for pipeline spectrum
+        K4E = KMonE * omega_pipeline
+        K4E converts broadband RSRF-weighted point source flux density to
+          monochromatic fully-extended source flux density at reference
+          frequencies.
+    
+    Dependencies:
+        getCal() - retrieve spire photometer calibration context
+        spireBands() - list of spire bands
+        calcKMonE() - calculate fully extended
+        calcOmegaEff() - calculate effective beam area
+    """
     getCal()
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #spireBands=["PSW","PMW","PLW"]
@@ -1152,6 +1537,33 @@ def calcK4E():
     return k4E
 
 def calcKPtoE():
+    """
+    ================================================================================
+    calcKPtoE():
+        Calculated conversion from point source flux density to full-extended source
+        surface brightness for pipeline spectrum
+
+    Inputs:
+        NONE
+
+    Outputs:
+        (dict double) KPtoE for pipeline spectrum (one per band)
+                    
+    Calculation:
+        [See Handbook Eq 5.22]
+        Calculate KMonE conversion
+        Calculate K4P conversion
+        KPtoE = KMonE / K4P
+        KPtoE converts monochromatic point source flux density to
+          monochromatic fully-extended source surface brightness at reference
+          frequencies.
+    
+    Dependencies:
+        getCal() - retrieve spire photometer calibration context
+        spireBands() - list of spire bands
+        calcKMonE() - calculate fully extended KMonE parameter
+        calcK4P() - calculate point source K4P parameter
+    """
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
     #spireBands=["PSW","PMW","PLW"]
     
@@ -1169,6 +1581,39 @@ def calcKPtoE():
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 def calcKColP(alphaK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKColP(alphaK,verbose=False,table=False):
+        Calculated point source colour correction factor for power law spectrum
+
+    Inputs:
+        alphaK:  (scalar/float array) Spectral index(es) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) colour correction factor (one scalar/list per band,
+              depending on whether alphaK is scalar/list)
+        If table==True:
+            (TableDataset) colour correction factor (one column per band,
+              one row per alphaK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.25]
+        Calculates K4P parameter pipeline (alpha=-1)
+        Calculates point source conversion for input spectrum(s)
+        Divides to calculate colour correction factor
+        If table is set, returns a TableDataset
+        KColP converts from monochromatic point source flux density for
+          pipeline spectrum to monochromatic point source flux density for input
+          spectrum.
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcK4P() - calculate K4P parameter
+        calcSpireKcorr() - calculate spire flux conversion factor
+        herschel.ia.dataset.TableDataset()
+    """
     #print '\nCalculating point source colour correction parameters for a given alpha...'
 
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1218,6 +1663,40 @@ def calcKColP(alphaK,verbose=False,table=False):
 
 
 def calcKColP_BB(betaK,tempK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKColP_BB(betaK,tempK,verbose=False,table=False):
+        Calculated point source colour correction factor for modified Blackbody spectrum
+
+    Inputs:
+        betaK:   (float) Emmisivity spectral index to use
+        tempK:   (scalar/float array) Temperature(s) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) colour correction factor (one scalar/list per band,
+              depending on whether tempK is scalar/list)
+        If table==True:
+            (TableDataset) colour correction factor (one column per band,
+              one row per tempK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.29]
+        Calculates K4P parameter for pipeline (alpha=-1)
+        Calculates point source conversion for input spectrum(s)
+        Divides to calculate colour correction factor
+        If table is set, returns a TableDataset (betaK in metadata)
+        KColP converts from monochromatic point source flux density for
+          pipeline spectrum to monochromatic point source flux density for input
+          spectrum.
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcK4P() - calculate K4P parameter
+        calcSpireKcorr() - calculate spire flux conversion factor
+        herschel.ia.dataset.TableDataset()
+    """
     #-----------------------------------------------------------------------
     #print 'Calculating point source colour correction parameters over beta & temp...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1270,6 +1749,39 @@ def calcKColP_BB(betaK,tempK,verbose=False,table=False):
 #-----------------------------------------------------------------------
 
 def calcKColE(alphaK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKColE(alphaK,verbose=False,table=False):
+        Calculated full-extended ource colour correction factor for power law spectrum
+
+    Inputs:
+        alphaK:  (scalar/float array) Spectral index(es) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) colour correction factor (one scalar/list per band,
+              depending on whether alphaK is scalar/list)
+        If table==True:
+            (TableDataset) colour correction factor (one column per band,
+              one row per alphaK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.27]
+        Calculates KMonE parameter for pipeline (alpha=-1)
+        Calculates full-extended source conversion for input spectrum(s)
+        Divides to calculate colour correction factor
+        If table is set, returns a TableDataset
+        KColE converts from monochromatic fully-extended surface brightness for
+          pipeline spectrum to monochromatic fully-extended surface brightness for input
+          spectrum.
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcKMonE() - calculate KMonE parameter
+        calcSpireKcorr() - calculate spire flux conversion factor
+        herschel.ia.dataset.TableDataset()
+    """
     #-----------------------------------------------------------------------
     #print '\nCalculating extended source colour correction parameters over alpha...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1319,6 +1831,40 @@ def calcKColE(alphaK,verbose=False,table=False):
 #-----------------------------------------------------------------------
 
 def calcKColE_BB(betaK,tempK,verbose=False,table=False):
+    """
+    ================================================================================
+    calcKColE_BB(betaK,tempK,verbose=False,table=False):
+        Calculated full-extended ource colour correction factor for mod-BB spectrum
+
+    Inputs:
+        betaK:   (float) Emmisivity spectral index to use
+        tempK:   (scalar/float array) Temperature(s) to use
+        verbose: (boolean) Set to print more information. Default=True.
+        table:   (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) colour correction factor (one scalar/list per band,
+              depending on whether tempK is scalar/list)
+        If table==True:
+            (TableDataset) colour correction factor (one column per band,
+              one row per tempK value)
+                    
+    Calculation:
+        [See Handbook Eq 5.30]
+        Calculates KMonE parameter for pipeline (alpha=-1)
+        Calculates full-extended source conversion for input spectrum(s)
+        Divides to calculate colour correction factor
+        If table is set, returns a TableDataset (betaK in metadata)
+        KColE converts from monochromatic fully-extended surface brightness for
+          pipeline spectrum to monochromatic fully-extended surface brightness for input
+          spectrum.
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        calcKMonE() - calculate KMonE parameter
+        calcSpireKcorr() - calculate spire flux conversion factor
+        herschel.ia.dataset.TableDataset()
+    """
     #
     #print 'Calculating extended source colour correction parameters over beta & temp...'
     #cal=getCal(cal=cal,calPool=calPool,calFile=calFile)
@@ -1368,6 +1914,42 @@ def calcKColE_BB(betaK,tempK,verbose=False,table=False):
 # test for some parameters
 #
 def spireColCorrTest(beamType='Full'):
+    """
+    ================================================================================
+    spireColCorrTest(beamType='Full'):
+        Test script to demonstrate use of colour correction calculations
+
+    Inputs:
+        beamType: (string) beam calculation to use ('Full'|'Simple')
+                    Default='Full'
+    Outputs:
+        (dict double) beamMonoArea for chose beamType (one array per band)
+        (double array) alphaK values used in test script
+        (dict double) effective areas for alphaK values (one array per band)
+        (dict double) beam corrections for alphaK values (one array per band)
+        (dict double) KColP for alphaK values (one array per band)
+        (dict double) KColE for alphaK values (one array per band)
+                    
+    Calculation:
+        Calculates all the correction parameters
+        Returns some for range of alphas.
+    
+    Dependencies:
+        getCal() - get calibration tree
+        calcBeamMonoArea() - calculate beam monochromatic area
+        calcK4P() - calculate K4P parameter
+        calcKMonE() - calculate KMonE parameter
+        calcK4E() - calculate K4E parameter
+        calcKPtoE() - calculate KPtoE parameter
+        calcOmegaEff() - calculate effective beam area for powerl law spectrum
+        calcOmegaEff_BB() - calculate effective beam area for mod-BB spectrum
+        calcKBeam() - calculate beam correction for power law spectrum
+        calcKBeam_BB() - calculate beam correction for power mod-BB spectrum
+        calcKColP() - calculate point source colour correction for power law spectrum
+        calcKColP_BB() - calculate point source colour correction for mod-BB spectrum
+        calcKColE() - calculate fully-extended source colour correction for power law spectrum
+        calcKColE_BB() - calculate fully-extended source colour correction for mod-BB spectrum
+    """
     
     calphot=getCal(calPool='spire_cal_12_2')
     alphaArr=Float1d(range(-4,5)) #range of alphas to use.
@@ -1411,6 +1993,23 @@ def spireColCorrTest(beamType='Full'):
     return(beamMonoArea,alphaArr,omegaEff,KBeam,KColP,KColE)
 
 def compFullSimple():
+    """
+    ================================================================================
+    compFullSimple():
+        Test script to compare effect of full/simple beam treatments
+    Inputs:
+        NONE
+    Outputs:
+        8 x Plots
+                    
+    Calculation:
+        Calculates correction parameters for full beam treatment
+        Calculates correction parameters for simple beam treatment
+        Plots values and full/simple comparisons
+    
+    Dependencies:
+        spireColCorrTest() - test colour correction parameters
+    """
     #compare full vs single beam treatments:
     beamMonoArea_F,alphaArr,omegaEff_F,KBeam_F,KColP_F,KColE_F=spireColCorrTest(beamType='Full')
     beamMonoArea_S,alphaArr,omegaEff_S,KBeam_S,KColP_S,KColE_S=spireColCorrTest(beamType='Simple')

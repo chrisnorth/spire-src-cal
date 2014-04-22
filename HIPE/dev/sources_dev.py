@@ -95,7 +95,7 @@ from java.lang import Double,Float,String
 from java.lang.Math import PI
 from herschel.ia.numeric.toolbox import RealFunction
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
-from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator
+from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator,LinearInterpolator
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -539,6 +539,7 @@ class SourceProfile(object):
             self.origSrc=NoneSourceType()
                         
     def calcArea(self,forceNumerical=False,forceAnalytical=False):
+        #print 'calc area'
         if forceNumerical:
             doNum=True
         elif forceAnalytical:
@@ -560,6 +561,7 @@ class SourceProfile(object):
 
         if doNum:
             #calculate area numerically
+            #print 'numerical integration'
             profInterp=CubicSplineInterpolator(self.radArr,2.*PI*self.radArr*self.profile)
             integrator=TrapezoidalIntegrator(0,self.maxRad)
             srcArea=integrator.integrate(profInterp)

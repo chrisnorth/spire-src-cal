@@ -79,7 +79,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 
     #integrate to get solid angle (in arcsec^2)
     
-    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    beamInterp=CubicSplineInterpolator(beamRad,beamNew * 2. * PI * beamRad)
     integrator=TrapezoidalIntegrator(0,maxRad)
     beamMonoArea=integrator.integrate(beamInterp)
 
