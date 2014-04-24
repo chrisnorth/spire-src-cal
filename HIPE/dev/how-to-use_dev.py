@@ -31,6 +31,7 @@
 import SpireHandbookBundle_dev as hb
 ## An alternative is to import all the functions (and global variables directly)
 #from SpireHandbookBundle_dev import *
+## or just opened the script and execute in HIPE (or use to execfile())
 ## However, the examples below assume it has been import as hb
 
 ## If required, specify a calibration version (default is to use spire_cal_12_2)
