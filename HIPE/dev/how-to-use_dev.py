@@ -72,7 +72,8 @@ print 'KPtoE=',hb.calcKPtoE()
 print 'Omega(alpha=-1)=',hb.calcOmegaEff(-1.0)
 
 ## Set range of power laws to use in thie example
-alphaArr=Float1d(range(-4,5)) #range of alphas to use.
+alphaArr=Float1d([-4.0,-3.5,-3.0,-2.5,-2.0,-1.5,-1.0,-0.5,0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0])
+#alphaArr=Float1d(range(-4,5,0.5)) #range of alphas to use.
 
 ## Calculate effective beams
 print '\nTesting hb.calcOmegaEff'
@@ -119,23 +120,24 @@ print 'KColE(1.75,20)=',hb.calcKColE_BB(1.75,20.0)
 KColE_BB = hb.calcKColE_BB(1.75,[20.0,30.,40.])
 
 ## Calculate aperture corrections (can be slow)
-print '\nTesting aperture corrections'
+#print '\nTesting aperture corrections'
 # 1) single power law spectrum
 apCorr=hb.calcApCorr(-2.0,verbose=True)
 print 'Ap Corr [incBG] (-2)=',apCorr[0]
 print 'Ap Corr [noBG] (-2)=',apCorr[1]
 # 2) multiple power law spectrum
-#apCorr = hb.calcApCorr(alphaArr,verbose=True)
-#apCorrIncBG=apCorr[0]
-#apCorrNoBG=apCorr[1]
+apCorr = hb.calcApCorr(alphaArr,verbose=True)
+apCorrIncBG=apCorr[0]
+apCorrNoBG=apCorr[1]
 # 3) single modified black body spectrum
-#apCorr_BB = hb.calcApCorr_BB(1.75,20.0,verbose=True)
-#print 'Ap Corr [incBG] (1.75,20)=',apCorr_BB[0]
-#print 'Ap Corr [noBG] (1.75,20)=',apCorr_BB[1]
+apCorr_BB = hb.calcApCorr_BB(1.75,20.0,verbose=True)
+print 'Ap Corr [incBG] (1.75,20)=',apCorr_BB[0]
+print 'Ap Corr [noBG] (1.75,20)=',apCorr_BB[1]
 # 4) multiple modified black body spectrum
-#apCorr_BB = hb.calcApCorr_BB(1.75,[20.0,30.,40.],verbose=True)
-#apCorrIncBG_BB=apCorr_BB[0]
-#apCorrNoBG_BB=apCorr_BB[1]
+apCorr_BB = hb.calcApCorr_BB(1.75,[20.0,30.,40.],verbose=True)
+apCorrIncBG_BB=apCorr_BB[0]
+apCorrNoBG_BB=apCorr_BB[1]
+
 
 #-------------------------------------------------------------------------------
 #===============================================================================

@@ -496,7 +496,7 @@ def getSpireFreq():
         #global variable already defined, so do nothing
     except:
         #not defined, so recalculate
-        deltaNu = 0.1e9        # 0.1 GHz
+        deltaNu = 1.e9        # 0.1 GHz
         nuMin   = 300.e9
         nuMax   = 1800.e9
         nNu     = FLOOR((nuMax-nuMin)/deltaNu)
@@ -662,7 +662,7 @@ def getSpireFilt(rsrfOnly=False):
         #indexes of freq in apEff
         spireFreq=getSpireFreq()
         nNu=len(spireFreq)
-        ixA = spireFreq.where((spireFreq>=MAX(spireApEffFreq)) & (spireFreq<=MAX(spireApEffFreq)))
+        ixA = spireFreq.where((spireFreq>=MIN(spireApEffFreq)) & (spireFreq<=MAX(spireApEffFreq)))
         # spire RSRF * ApEff
         spireFilt={}
         #interpolate to freq array and apply to RSRF
@@ -844,8 +844,8 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
         fSky  = freq**alpha
 
     # Integrate monochromatic area over frequency, weighted by rsrf and fSky
-    numInterp=LinearInterpolator(freq,transm * fSky * monoArea)
-    denomInterp=LinearInterpolator(freq,transm * fSky)
+    numInterp=CubicSplineInterpolator(freq,transm * fSky * monoArea)
+    denomInterp=CubicSplineInterpolator(freq,transm * fSky)
     minFreq=MIN(freq)
     maxFreq=MAX(freq)
     integrator=TrapezoidalIntegrator(minFreq,maxFreq)
@@ -1099,8 +1099,8 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
         # monoArea is the monochromatic beam solid angle at effFreq
 
     # integrate over frequency
-    numInterp=LinearInterpolator(freq,transm)
-    denomInterp=LinearInterpolator(freq,transm * fSky * area)
+    numInterp=CubicSplineInterpolator(freq,transm)
+    denomInterp=CubicSplineInterpolator(freq,transm * fSky * area)
     minFreq=MIN(freq)
     maxFreq=MAX(freq)
 
@@ -2151,9 +2151,9 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
                 effBeam_x['area']/omegaAp    
             apCorrIncBG[band] =  \
                 effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
-            if (verbose):
-                print 'Calculated apCorr (noBG) for alpha=%f: '%alphaK,apCorrNoBG["PSW"],apCorrNoBG["PMW"],apCorrNoBG["PLW"]
-                print 'Calculated apCorr (incBG) for alpha=%f: '%alphaK,apCorrIncBG["PSW"],apCorrIncBG["PMW"],apCorrIncBG["PLW"]
+        if (verbose):
+            print 'Calculated apCorr (noBG) for alpha=%f: '%alphaK,apCorrNoBG["PSW"],apCorrNoBG["PMW"],apCorrNoBG["PLW"]
+            print 'Calculated apCorr (incBG) for alpha=%f: '%alphaK,apCorrIncBG["PSW"],apCorrIncBG["PMW"],apCorrIncBG["PLW"]
     else:
         #alphaK is scalar
         apCorrNoBG={'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
