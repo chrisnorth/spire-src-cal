@@ -83,15 +83,24 @@
 #-------------------------------------------------------------------------------
 
 import herschel
-from herschel.ia.numeric import Double1d,Float1d,Int1d
-from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs
+from herschel.ia.numeric import Double1d,Float1d,Int1d,Double2d
+from herschel.ia.dataset.image import SimpleImage
+from herschel.ia.dataset.image.wcs import Wcs
+from herschel.ia.toolbox.image import TransposeTask,CropTask,CircleHistogramTask,ImageConvolutionTask
+crop=CropTask()
+transpose=TransposeTask()
+circleHistogram=CircleHistogramTask()
+imageConvolution=ImageConvolutionTask()
+from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs,Sqrt,Log
 FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
 EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
 COS=herschel.ia.numeric.toolbox.basic.Cos.PROCEDURE
 MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
 MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 ABS=herschel.ia.numeric.toolbox.basic.Abs.FUNCTION
-from java.lang import Double,Float,String
+SQRT=herschel.ia.numeric.toolbox.basic.Sqrt.PROCEDURE
+LOG=herschel.ia.numeric.toolbox.basic.Log.PROCEDURE
+from java.lang import Double,Float,String,Integer
 from java.lang.Math import PI
 from herschel.ia.numeric.toolbox import RealFunction
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
@@ -220,19 +229,26 @@ class Source(object):
     def calcProfile(self,radArr):
         #run calcProfile associated with typeTemplate
         srcProf=self.typeTemplate.calcProfile(radArr,self.params)
-        return(SourceProfile(radArr,srcProf,self))
+        return(SourceProfile(radArr,srcProf,None,self))
 
     def calcArea(self):
         #run calcArea associated with typeTemplate
         srcArea=self.typeTemplate.calcArea(self.params)
         return(srcArea)
+        
+    def calcFwhm(self):
+        #run calcArea associated with typeTemplate
+        srcFwhm=self.typeTemplate.calcFwhm(self.params)
+        return(srcFwhm)
     
     def initAvailableTypes(self):
         self.availableTypes={}
         self.availableTypes["GAUSSIAN"]=GaussianSourceType()
+        self.availableTypes["EXPONENT"]=ExponentialSourceType()
         self.availableTypes['LINEAR']=LinearSourceType()
         self.availableTypes['POWERLAW']=PowerLawSourceType()
         self.availableTypes['CONSTANT']=ConstantSourceType()
+        self.availableTypes['TOPHAT']=TopHatSourceType()
         self.availableTypes['LINCONST']=LinConstSourceType()
 
     def listSrcTypes(self):
@@ -293,7 +309,11 @@ class SourceType(object):
     def calcArea(self,params=None):
         print 'Warning: no analytical value for area of %s source'%self.type
         return(Double.NaN)
-    
+        
+    def calcFwhm(self,params=None):
+        print 'Warning: no analytical value for FHWM of %s source'%self.type
+        return(Double.NaN)
+        
     def __str__(self):
         result=self.__class__
         result="\nType name: %s"%self.desc
@@ -303,7 +323,7 @@ class SourceType(object):
         return(result)
         
     
-class NoneSourceType:
+class NoneSourceType(SourceType):
     def __init__(self):
         self.type='NONE'
         self.desc='NONE source type'
@@ -315,10 +335,13 @@ class NoneSourceType:
     def calcProfile(self,radArr,params):
         return(Double1d(len(radArr),Double.NaN))
         
-    def calcArea(self,params):
+    def calcArea(self,params=None):
         return(Double.NaN)
         
     def calcZeroVal(self,params):
+        return(Double.NaN)
+        
+    def calcFwhm(self,params):
         return(Double.NaN)
     
     def calcScaleWidth(self,params):
@@ -339,8 +362,9 @@ class GaussianSourceType(SourceType):
         srcProf=srcPeak * EXP(-radArr**2/(2.*srcWidth**2))
         return(srcProf)
         
-    def calcArea(self,params):
+    def calcArea(self,params=None):
         #integrate Gaussian
+        assert params!=None,'must provide parameters'
         srcWidth=params[0]
         srcPeak=params[1]
         srcArea=srcPeak * 2*PI*srcWidth**2
@@ -350,10 +374,55 @@ class GaussianSourceType(SourceType):
         zeroVal=params[1]
         return(zeroVal)
         
+    def calcFwhm(self,params):
+        srcWidth=params[0]
+        srcFwhm=2. * srcWidth * SQRT(2.*LOG(2.))
+        return(srcFwhm)
+        
     def calcScaleWidth(self,params):
         scaleWidth=params[0]
         return(scaleWidth)
 
+class ExponentialSourceType(SourceType):
+    def __init__(self):
+        self.type='EXPONENT'
+        self.desc='Exponential profile'
+        self.minPar=1
+        self.paramNames=["Scale width","Peak value"]
+        self.defaults=[100.,1.0]
+        self.maxPar=len(self.paramNames)
+    
+    def calcProfile(self,radArr,params):
+        srcWidth=params[0]
+        srcPeak=params[1]
+        srcProf=srcPeak * EXP(-radArr/srcWidth)
+        return(srcProf)
+        
+    def calcArea(self,params=None):
+        #integrate exponential
+        assert params!=None,'must provide parameters'
+        srcWidth=params[0]
+        srcPeak=params[1]
+        if srcWidth > 0:
+            srcArea=srcPeak * srcWidth
+        else:
+            print 'Warning: no analytical value for area of EXPONENT source with negative scale width'
+            srcArea=Double.NaN
+        return(srcArea)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[1]
+        return(zeroVal)
+        
+    def calcFwhm(self,params):
+        srcWidth=params[0]
+        srcFwhm=2.*srcWidth * LOG(2.)
+        return(srcFwhm)
+        
+    def calcScaleWidth(self,params):
+        scaleWidth=params[0]
+        return(scaleWidth)
+        
 class LinearSourceType(SourceType):
     def __init__(self):
         self.type='LINEAR'
@@ -402,6 +471,18 @@ class PowerLawSourceType(SourceType):
         zeroVal=params[3]
         return(zeroVal)
         
+    def calcFwhm(self,params):
+        srcIdx=params[0]
+        srcScalRad=params[1]
+        srcMinRad=params[2]
+        srcValMinRad=params[3]
+        if srcValMinRad==Double.NaN:
+            #calculate from minRad
+            srcFwhm = 2.*srcMinRad / 2.**(1./srcIdx)
+        else:
+            srcFwhm = 2. * (srcValMinRad/2)**(1./srcIdx) * srcScalRad
+        return(srcFwhm)
+        
     def calcScaleWidth(self,params):
         #return scale radius
         scaleWidth=params[1]
@@ -425,11 +506,49 @@ class ConstantSourceType(SourceType):
         zeroVal=params[0]
         return(zeroVal)
         
+    def calcFwhm(self,params):
+        return(Double.POSITIVE_INFINITY)
+        
     def calcScaleWidth(self,params):
         #set as infinity
         scaleWidth=Double.POSITIVE_INFINITY
         return(scaleWidth)
+
+class TopHatSourceType(SourceType):
+    def __init__(self):
+        self.type='TOPHAT'
+        self.desc='Top Hat profile'
+        self.minPar=1
+        self.paramNames=["Width","Value"]
+        self.defaults=[100.,1.]
+        self.maxPar=len(self.paramNames)
         
+    def calcProfile(self,radArr,params):
+        srcWidth=params[0]
+        srcVal=params[1]
+        srcProf=Double1d(len(radArr))
+        srcProf[radArr.where(radArr<=srcWidth)]=srcVal
+        return(srcProf)
+        
+    def calcArea(self,params):
+        srcWidth=params[0]
+        srcVal=params[1]
+        area = srcVal * PI * srcWidth**2
+        return(area)
+        
+    def calcZeroVal(self,params):
+        zeroVal=params[1]
+        return(zeroVal)
+        
+    def calcFwhm(self,params):
+        srcFwhm=params[0]
+        return(srcFwhm)
+        
+    def calcScaleWidth(self,params):
+        #set as infinity
+        scaleWidth=params[0]
+        return(scaleWidth)
+
 class LinConstSourceType(SourceType):
     def __init__(self):
         self.type='LINCONST'
@@ -451,7 +570,9 @@ class LinConstSourceType(SourceType):
             srcProf[srcProf.where(srcProf < srcMin)]=srcMin
         return(srcProf)
         
-    def calcArea(self,params):
+    def calcArea(self,params=None):
+        assert params!=None,'must provide parameters'
+            
         srcGrad=params[0]
         srcZero=params[1]
         srcMin=params[2]
@@ -464,11 +585,27 @@ class LinConstSourceType(SourceType):
                 srcArea=srcArea - (PI/3)*(srcZero-srcMax)**3/srcGrad**2
         else:
             #no analytical solution
-            print 'Warning: no analytical value for area of LINCONST source'
+            if srcMin!=0:
+                print 'Warning: no analytical value for area of LINCONST source with min < 0'
+            if srcGrad>=0:
+                print 'Warning: no analytical value for area of LINCONST source with gradient >= 0'
             srcArea=Double.NaN
             
         return(srcArea)
-            
+        
+    def calcFwhm(self,params):
+        srcGrad=params[0]
+        srcZero=params[1]
+        srcMin=params[2]
+        srcMax=params[3]
+        if srcGrad<0:
+            srcFwhm=(srcZero-srcMin)/srcGrad
+        else:
+            #no analytical solution
+            print 'Warning: no analytical value for FWHM of LINCONST source with gradient >= 0'
+            srcFwhm=Double.NaN
+        return(srcFwhm)
+        
     def calcZeroVal(self,params):
         zeroVal=params[1]
         if zeroVal < params[2]: zeroVal=params[2]
@@ -488,11 +625,12 @@ class LinConstSourceType(SourceType):
 #===============================================================================
 #-------------------------------------------------------------------------------
 class SourceProfile(object):
-    def __init__(self,radArr=None,profile=None,originator=None):
+    def __init__(self,radArr=None,profile=None,error=None,originator=None):
         #set radArr
         self.setRadArr(radArr)
         #set profile
-        self.profile=profile or None
+        self.profile=Double1d(profile) or None
+        self.setError(error)
         #check radArr and profile are compatible
         self.check()
         #set original Source object
@@ -508,6 +646,24 @@ class SourceProfile(object):
             self.nRad=0
             self.maxRad=Double.NaN
 
+    def setError(self,error=None):
+        #set error
+        if self.radArr==None:
+            #no radArr
+            assert error==None,\
+              'cannot set error without radArr'
+            self.error=None
+        else:
+            #radArr exists
+            if error==None:
+                #make black array
+                self.error=Double1d(self.nRad)
+            else:
+                assert len(error)==self.nRad,\
+                  'error array must be same length as rad array'
+                self.error=error
+
+
     def check(self):
         #check radArr and profile are both/neither None
         #check both same length
@@ -521,13 +677,15 @@ class SourceProfile(object):
               'radArr and profile must be of same lengths'%(len(radArr),len(profile))
 
     def copy(self):
-        new=SourceProfile(radArr=self.radArr,profile=self.profile,originator=self.origSrc)
+        new=SourceProfile(radArr=self.radArr,profile=self.profile,error=self.error,originator=self.origSrc)
         return(new)
         
     def generate(self,src,radArr):
         #generate from Source object
-        self.setradArr(radArr)
+        self.setRadArr(radArr)
         self.profile=src.calcProfile(radArr)
+        #make blank error array
+        self.setError(None)
         self.setOrig(src)
 
     def setOrig(self,src):
@@ -537,7 +695,48 @@ class SourceProfile(object):
         else:
             self.fromSrc=False
             self.origSrc=NoneSourceType()
-                        
+            
+    def clearOrig(self):
+        self.fromSrc=False
+        self.origSrc=NoneSourceType()
+
+    def regrid(self,radNew):
+        #create interpolation objects
+        profInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.profile))
+        errInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.error))
+        
+        #get valid range of radii
+        minRad=min(self.radArr)
+        maxRad=self.maxRad
+        iR=radNew.where(radNew>=minRad and radNew <= maxRad)
+        nRadNew=len(radNew)
+        #make new profile and error arrays
+        profNew=Double1d(nRadNew)
+        errNew=Double1d(nRadNew)
+        profNew[iR]=profInterp(radNew[iR])
+        errNew[iR]=errInterp(radNew[iR])
+        return(SourceProfile(radNew,profNew,errNew))
+        
+    def normProf(self):
+        #normalise such that profile=1 at r=0
+        prof0=self.profile[0]
+        newProf=self.copy()
+        newProf.profile=self.profile/prof0
+        newProf.error=self.error/prof0
+        newProf.clearOrig()
+        return(newProf)
+        
+    def normArea(self):
+        #normalise such that area=1
+        area0=self.calcArea(forceNumerical=True)
+        print 'area0=',area0
+        newProf=self.copy()
+        newProf.profile=self.profile/area0
+        newProf.error=self.error/area0
+        newProf.clearOrig()
+        print 'new area=',newProf.calcArea()
+        return(newProf)
+
     def calcArea(self,forceNumerical=False,forceAnalytical=False):
         #print 'calc area'
         if forceNumerical:
@@ -568,61 +767,148 @@ class SourceProfile(object):
             
         return(srcArea)
         
-    def add(self,prof2):
+    def calcFwhm(self,forceNumerical=False,forceAnalytical=False):
+        #print 'calc area'
+        if forceNumerical:
+            doNum=True
+        elif forceAnalytical:
+            doNum=False
+            if self.fromSrc:
+                srcFwhm=self.origSrc.calcFwhm()
+            else:
+                srcFwhm=Double.NaN()
+        else:
+            if self.fromSrc:
+                #try to get analytical area from origSrc
+                srcArea=self.origSrc.calcFwhm()
+                if Double.isNaN(srcFwhm):
+                    doNum=True
+                else:
+                    doNum=False
+            else:
+                 doNum=True
+
+        if doNum:
+            #calculate area numerically
+            #print 'numerical integration'
+            try:
+                #try interpolation (only works if profile is monatonic
+                profInterp=CubicSplineInterpolator(self.profile,self.radArr)
+                profHalf=self.profile[0]/2.
+                srcFwhm=2.*profInterp(profHalf)
+            except:
+                #step through manually
+                halfFound=False
+                profHalf=self.profile[0]/2.
+                r=0
+                profThis=self.profile[0]
+                radThis=self.radArr[0]
+                while not halfFound:
+                    r=r+1
+                    profPrev=profThis.copy()
+                    radPrev=radPrev.copy()
+                    radThis=this.radArr[r]
+                    profThis=this.profile[2]
+                    if profThis<=profHalf:
+                        halfFound=True
+                srcFwhm = 2. * (radPrev + (profHalf-profPrev)*(radThis-radPrev)/(profThis-profPrev))
+
+        return(srcFwhm)
+        
+    def add(self,prof2,err2=None):
         #add profile to another
-        
-        #check whether prof2 is scalar of array
-        try:
-            #len doesn't work on scalar
-            len(prof2)
-            isScal=False
-        except:
-            isScal=True
-        
-        if not isScal:
-            #check vector lengths
-            assert len(prof2)==len(self.profile),\
-              'Added profile must scalar of of same length as SourceProfile'
-        
-        #multiply profiles
-        self.profile = self.profile + prof2
+        newProf=self.copy()
+        if type(prof2)==SourceProfile:
+            #interpolate new prof to same as existing profile
+            prof2Regrid=prof2.regrid(self.radArr)
+            #add profiles
+            newProf.profile = self.profile + prof2Regrid.profile
+            #add errors in quadrature
+            newProf.error = SQRT(self.error**2 + prof2Regrid.error**2)
+        else:
+            #check whether prof2 is scalar of array
+            try:
+                #len doesn't work on scalar
+                len(prof2)
+                isScal=False
+            except:
+                isScal=True
+            
+            if not isScal:
+                #check vector lengths
+                assert len(prof2)==len(self.profile),\
+                  'Added profile must scalar of of same length as SourceProfile'
+                  
+                assert len(err2)==len(self.profile),\
+                  'Added profile must scalar of of same length as SourceProfile'
+            
+            #add profiles
+            newProf.profile = self.profile + prof2
+            
+            if error!=None:
+            #check whether err2 is scalar of array
+                try:
+                    #len doesn't work on scalar
+                    len(prof2)
+                    isScal=False
+                except:
+                    isScal=True
+                
+                if not isScal:
+                    #check vector lengths
+                    assert len(prof2)==len(self.profile),\
+                      'Added profile must scalar of of same length as SourceProfile'
+                      
+                    assert len(err2)==len(self.profile),\
+                      'Added profile must scalar of of same length as SourceProfile'
         #no longer based on SourceType
-        self.origSrc=NoneSourceType()
-        self.fromSrc=False
+        newProf.clearOrig()
         
-        return(self)
+        return(newProf)
         
     def mult(self,prof2):
         #multiply profile by another
+        newProf=self.copy()
         
-        #check whether prof2 is scalar of array
-        try:
-            #len doesn't work on scalar
-            len(prof2)
-            isScal=False
-        except:
-            isScal=True
-        
-        if not isScal:
-            #check vector lengths
-            assert len(prof2)==len(self.profile),\
-              'Multiplied profile must scalar of of same length as SourceProfile'
-        
-        #multiply profiles
-        self.profile = self.profile * prof2
+        if type(prof2)==SourceProfile:
+            #interpolate new prof to same as existing profile
+            prof2Regrid=prof2.regrid(self.radArr)
+            #add profiles
+            newProf.profile = self.profile * prof2Regrid.profile
+            #add relative errors in quadrature
+            newProf.error = newProf.profile * SQRT((self.error/self.profile)**2 + (prof2Regrid.error/prof2Regrid.profile)**2)
+        else:
+            #check whether prof2 is scalar of array
+            try:
+                #len doesn't work on scalar
+                len(prof2)
+                isScal=False
+            except:
+                isScal=True
+            
+            if not isScal:
+                #check vector lengths
+                assert len(prof2)==len(self.profile),\
+                  'Multiplied profile must scalar of of same length as SourceProfile'
+            
+            #multiply profiles and errors
+            newProf.profile = self.profile * prof2
+            newProf.error = self.error * prof2
         #no longer based on SourceType
-        self.origSrc=NoneSourceType()
-        self.fromSrc=False
+        newProf.origSrc=NoneSourceType()
+        newProf.fromSrc=False
         
-        return(self)
+        return(newProf)
 
     def rad2k(self):
         #make k-array
-        kArr=Double1d(self.nRad)
-        nK=len(kArr)
-        for k in range(len(kArr)-1):
-            #print k,radArr[(nRad-1)-k]
-            kArr[k+1]=2*PI/self.radArr[(self.nRad-1)-k]
+        maxRad=self.nRad
+        minK=(PI/maxRad)
+        nK=self.nRad/2
+        kArr=Double1d(range(nK))*minK
+        #for k in range(len(kArr)-1):
+        #    #print k,radArr[(nRad-1)-k]
+        #    kArr[k+1]=PI/self.radArr[(self.nRad-1)-k]
         return(kArr)
 
     def calcRft(self):
@@ -635,12 +921,74 @@ class SourceProfile(object):
         profInterp=CubicSplineInterpolator(self.radArr,self.profile)
         for k in range(nK):
             rftArg_k=rftArg(kArr[k],profInterp)
-            print 'rftArg calculated:',k,kArr[k]
+            print 'rft arg calculated:',k,kArr[k]
             rftProfile[k]=integrator.integrate(rftArg_k)
-            print 'integral calculated:',rftProfile[k]
+            print 'rft integral calculated:',rftProfile[k]
             #print k,kArr[k],rftProfile[k]
         return(RftProfile(kArr,rftProfile))
         
+    def makeImage(self):
+        #make image of source
+        #calculate image size
+        nXQuad=self.nRad
+        nYQuad=nXQuad
+        quadArr=Double2d(nXQuad,nYQuad)
+        quadErr=Double2d(nXQuad,nYQuad)
+        #print quadArr.dimensions
+        #create profile interpolation
+        profInterp=CubicSplineInterpolator(self.radArr,self.profile)
+        errInterp=CubicSplineInterpolator(self.radArr,self.error)
+        #fill first quadrant
+        yList=range(nYQuad)
+        #print MIN(yList),MAX(yList)
+        for x in range(nXQuad):
+            radList=SQRT(x**2. + Double1d(yList)**2.)
+            #print x
+            inBeam=radList.where(radList <= self.maxRad)
+            #print inBeam
+            quadArr[x,inBeam]=profInterp(radList[inBeam])
+            quadErr[x,inBeam]=errInterp(radList[inBeam])
+            
+        #fill other quadrants
+        nXIm=2*self.nRad - 1
+        nYIm=nXIm
+        cXIm=self.nRad
+        cYIm=self.nRad
+        #imageArr=Double2d(nXIm,nYIm)
+        #imageErr=Double2d(nXIm,nYIm)
+        image=SimpleImage()
+        image.setImage(Double2d(nXIm,nYIm))
+        image.setError(Double2d(nXIm,nYIm))
+        #print 'image=',image
+        #top-right quarter
+        image['image'].data[cXIm-1:nXIm,cYIm-1:nYIm]=quadArr
+        image['error'].data[cXIm-1:nXIm,cYIm-1:nYIm]=quadErr
+        #print 'top-right done'
+        imageQuad=SimpleImage()
+        imageQuad.setImage(quadArr)
+        imageQuad.setError(quadErr)
+        #top-left-quarter
+        transImage=transpose(imageQuad,TransposeTask.FLIP_VERTICAL)
+        image['image'].data[0:cXIm,cYIm-1:nYIm]=transImage.getImage()
+        image['error'].data[0:cXIm,cYIm-1:nYIm]=transImage.getError()
+        #print 'bottom-right done'
+        #bottom-right quarter
+        transImage=transpose(imageQuad,TransposeTask.FLIP_HORIZONTAL)
+        image['image'].data[cXIm-1:nXIm,0:cYIm]=transImage.getImage()
+        image['error'].data[cXIm-1:nXIm,0:cYIm]=transImage.getError()
+        #print 'top-left done'
+        #bottom-left quarter
+        transImage=transpose(imageQuad,TransposeTask.FLIP_ANTIDIAGONAL)
+        image['image'].data[0:cXIm,0:cYIm]=transImage.getImage()
+        image['error'].data[0:cXIm,0:cYIm]=transImage.getImage()
+        #print 'bottom-left done'
+        #print image['image'].data.dimensions
+        #image=SimpleImage()
+        #image.setImage(imageArr)
+        
+        return(image)
+        
+    
     def __str__(self):
         result='%s'%self.__class__
         result=result+'\nnRad=%d'%self.nRad
@@ -663,11 +1011,11 @@ class SourceProfile(object):
 #===============================================================================
 #-------------------------------------------------------------------------------
 class RftProfile(object):
-    def __init__(self,kArr=None,rtfProfile=None):
+    def __init__(self,kArr=None,rftProfile=None):
         self.setKArr(kArr)
         self.rft=rftProfile or None
         
-    def setKArr(kArr=None):
+    def setKArr(self,kArr=None):
         self.kArr=kArr or None
         if self.kArr:
             self.nK=len(kArr)
@@ -687,22 +1035,228 @@ class RftProfile(object):
         nR=len(radArr)
         for r in range(nR-1):
             #print k,radArr[(nRad-1)-k]
-            radArr[r+1]=2*PI/self.kArr[(self.nK-1)-r]
+            radArr[r+1]=PI/self.kArr[(self.nK-1)-r]
         return(radArr)
         
     def calcInvRft(self):
         #compute Radial-Fourier Transform (RFT) of source profile
         #make k-array
         radArr=self.k2rad()
+        nRad=len(radArr)
         realProfile=Double1d(self.nK)
         integrator=TrapezoidalIntegrator(0.,self.maxK)
         rftInterp=CubicSplineInterpolator(self.kArr,self.rft)
-        for r in range(self.nR):
-            profArg_x=rftArg(self.radArr[r],rftInterp)
+        for r in range(nRad):
+            profArg_x=rftArg(radArr[r],rftInterp)
+            print 'inv-rft arg calculated:',r,radArr[r]
             realProfile[r]=integrator.integrate(profArg_x)
-            print r,radArr[r],realProfile[r]
+            print 'inv-rft integral calculated:',realProfile[r]
+            #print r,radArr[r],realProfile[r]
         return(radArr,realProfile)
 
+def convolveProfiles(profile1,profile2):
+    assert type(profile1)==SourceProfile,'profile1 must be SourceProfile object'
+    assert type(profile2)==SourceProfile,'profile2 must be SourceProfile object'
+    
+    #calculate profile resolutions
+    res1=profile1.maxRad/(profile1.nRad-1)
+    res2=profile2.maxRad/(profile2.nRad-1)
+    if res1<res2:
+        if(verbose):print 'regridding profile2 from %g to %g arcsec steps'%(res2,res1)
+        #different resolutions, so regrid profile2
+        radArr2New=Double1d(int(profile2.maxRad/res1))*res1
+        profile2Regrid=profile2.regrid(radArr2New)
+        profile1Regrid=profile1.copy()
+    elif res2<res1:
+        #different resolutions, so regrid profile2
+        if(verbose):print 'regridding profile1 from %g to %g arcsec steps'%(res1,res2)
+        radArr1New=Double1d(int(profile1.maxRad/res2))*res2
+        profile1Regrid=profile1.regrid(radArr1New)
+        profile2Regrid=profile2.copy()
+    else:
+        #same resolution
+        print 'no regridding necessary'
+        profile1Regrid=profile1.copy()
+        profile2Regrid=profile2.copy()
+
+    profile2Regrid=profile2Regrid.normArea()
+    #make images of profiles
+    image1=profile1Regrid.makeImage()
+    #print image1
+    image2=profile2Regrid.makeImage()
+    #print image2
+    #convolve images
+    convolvedImage=imageConvolution(image1,image2)
+    #compute profile of convolved image)
+    convolvedProfile=image2ProfCirc(convolvedImage)
+    return(convolvedProfile)
+
+def image2ProfCirc(imageIn):
+    #assumes an image is square, centred and circularly symmetric
+    nxIn=int(imageIn['image'].meta['naxis1'].long)
+    nyIn=int(imageIn['image'].meta['naxis2'].long)
+    cxIn=nxIn/2
+    cyIn=nyIn/2
+    radArr=Double1d(range(nxIn-cxIn))
+    profile=imageIn.getImage()[cxIn:nyIn,cyIn]
+    if imageIn.hasError():
+        error=imageIn.getError()[cxIn:nyIn,cyIn]
+    else:
+        error=None
+    return(SourceProfile(radArr,profile,error))
+
+def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,dRadArcsec=None,verbose=False):
+    #general script to take a position in a map and create a radial source profile
+    assert type(mapIn)==SimpleImage,'mapIn must be a SimpleImage'
+    if raCtr!=None and decCtr!=None:
+        useWcs=True
+        ctrProvided=True
+        if xCtr!=None and yCtr!=None:
+            #both types of coords set
+            print 'Both (raCtr,decCtr) and (xCtr,yCtr) set. Using (raCtr,decCtr). (xCtr,yCtr) might by overwritten.'
+    elif xCtr!=None and yCtr!=None:
+        useWcs=False
+        ctrProvided=True
+    else:
+        if(verbose):print 'no (raCtr,decCtr) or (xCtr,yCtr) provided. Using centre pixel'
+        ctrProvided=False
+
+    #extract wcs info
+    try:
+        wcs=mapIn.getWcs()
+    except:
+        wcs=None
+    assert type(wcs)==Wcs,'Cannot extract WCS from mapIn:'
+    naxis1=wcs.getNaxis1()
+    naxis2=wcs.getNaxis2()
+    #assume map has square pixels
+    mapPix=abs(wcs.getCdelt1())
+    mapPixArcsec=mapPix*3600.
+    mapXRadArcsec=naxis1*mapPix
+    mapYRadArcsec=naxis2*mapPix
+    
+    #set up radius array
+    if dRadArcsec==None:
+        #use map pixel size as default
+        dRadArcsec=mapPixArcsec
+    nRad=int(maxRadArcsec/dRadArcsec)
+    if verbose:
+        print 'computing radial profile to %g arcsec, with step of %g arcsec'%(maxRadArcsec,dRadArcsec)
+    #make radius array
+    radArr=Double1d(range(nRad))*dRadArcsec
+    maxRadDeg=maxRadArcsec/3600.
+    #make profile and error arrays
+    radProf=Double1d(nRad)
+    errProf=Double1d(nRad)
+
+    #crop map as appropriate
+    if useWcs:
+        [xCtr,yCtr]=wcs.getPixelCoordinates(raCtr,decCtr)
+        assert xCtr<naxis1 and xCtr>0 and yCtr<naxis2 and yCtr>0,'centre pixel not in centre of map: [%g,%g]'%(xCtr,yCtr)
+    else:
+        if not ctrProvided:
+            #user central pixel
+            xCtr=int(naxis1/2)
+            yCtr=int(naxis2/2)
+            if verbose:print 'using centre pixel: (x,y)=(%g,%g) (Ra,Dec)=(%g,%g)'%(xCtr,yCtr,raCtr,decCtr)
+        #get RA,Dec of centre
+        [raCtr,decCtr]=wcs.getWorldCoordinates(xCtr,yCtr)
+    validCrop=False
+    redCrop=False
+    cropRadPix=maxRadDeg/mapPix
+    while validCrop==False:
+        #set rows
+        row1=int(xCtr - cropRadPix)
+        row2=int(xCtr + cropRadPix)
+        column1=int(yCtr - cropRadPix)
+        column2=int(yCtr + cropRadPix)
+        if row1 <0:
+            #row1 is negative
+            #decrease crop radius and start again
+            validCrop=False
+            redCrop=True
+            cropRadPix=cropRadPix + row1
+            if verbose:print 'crop row1<0. Decreasing crop radius to %g'%cropRadPix
+        elif column1<0:
+            #column1 is negative
+            #decrease crop radius and start again
+            validCrop=False
+            redCrop=True
+            cropRadPix=cropRadPix + column1
+            if verbose:print 'crop column1<0. Decreasing crop radius to %g'%cropRadPix
+        elif row2>=naxis1:
+            #row2 > naxis1
+            #decrease crop radius and start again
+            validCrop=False
+            redCrop=True
+            cropRadPix=cropRadPix - (row2-naxis1)
+            if verbose:print 'crop row2>naxis1. Decreasing crop radius to %g'%cropRadPix
+        elif column2>=naxis1:
+            #column2 > naxis2
+            #decrease crop radius and start again
+            validCrop=False
+            redCrop=True
+            cropRadPix=cropRadPix - (column2-naxis2)
+            if verbose:print 'crop column2>naxis2. Decreasing crop radius to %g'%cropRadPix
+        else:
+            validCrop=True
+            
+    cropRadDeg=cropRadPix*mapPix
+    cropRadArcsec=cropRadDeg*3600.
+    #compute radius of cropped region (since cropRadPix may have changed)
+    if redCrop:
+        if verbose:print 'max radius reduced to %g arcsec due to edge of map'%cropRadPix
+        
+    nCropRad=int(cropRadArcsec/dRadArcsec)
+    
+    #crop map
+    mapCrop=crop(image=mapIn,row1=row1,column1=column1,row2=row2, column2=column2)
+    [xCtrCrop,yCtrCrop]=mapCrop.getWcs().getPixelCoordinates(raCtr,decCtr)
+    
+    #get first histogram
+    mapMax=max(mapCrop.getImage())
+    hist0=circleHistogram(image=mapCrop,lowCut=0.,highCut=mapMax,\
+          bins=1000, centerX=xCtrCrop,centerY=yCtrCrop,\
+          radiusArcsec=radArr[0]+dRadArcsec/2.)
+    histVals=hist0.getValues()
+    histThis=hist0.getFrequencies()
+    #number of pixels used
+    nPixRad=sum(histThis)
+    if nPixRad>0:
+        #calculate mean
+        meanRad=sum(histThis*histVals)/nPixRad
+        #calcuate standard deviation (simple)
+        sdRad=SQRT(sum(histThis * histVals**2)/nPixRad - meanRad**2)
+        radProf[0]=meanRad
+        errProf[0]=sdRad
+    else:
+        #get value and error from central pixel
+        radProf[0]=mapCrop.getIntensity(xCtrCrop,yCtrCrop)
+        errProf[0]=mapCrop.getError()[int(xCtrCrop),int(yCtrCrop)]
+        
+    #loop over radii in cropped map
+    for r in range(1,nCropRad):
+        #compute new max radius
+        rad=radArr[r]+dRadArcsec/2.
+        #copy previous histogram
+        histPrev=histThis.copy()
+        #calculate new histogram
+        histThis=circleHistogram(image=mapCrop,lowCut=0.,highCut=mapMax,\
+          bins=1000, centerX=xCtrCrop,centerY=yCtrCrop,radiusArcsec=rad).getFrequencies()
+        #take difference to get histogram for annulus
+        histDiff=histThis-histPrev
+        nPixRad=sum(histDiff)
+        if nPixRad>0:
+            #calculate mean
+            meanRad=sum(histDiff*histVals)/nPixRad
+            #calculate standard deviation (simple way)
+            sdRad=SQRT(sum(histDiff * histVals**2)/nPixRad - meanRad**2)
+            radProf[r]=meanRad
+            errProf[r]=sdRad
+        #print r,rad,sum(histThis),sum(histDiff),radProf[r]
+        
+    return([SourceProfile(radArr,radProf,errProf),mapCrop])
+    
 #def testJ0():
 #    #make test arrays of 0th order Bessel functions
 #    xarr=Float1d(range(0,2000))/100.
