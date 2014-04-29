@@ -109,7 +109,7 @@ dataDir = "//disks//winchester2//calibration_data//"
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(pool='spire_cal_12_1')
+	cal=spireCal(pool='spire_cal_12_2')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
