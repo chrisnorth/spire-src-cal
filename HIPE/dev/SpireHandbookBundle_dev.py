@@ -39,7 +39,8 @@
 #    Some of them also generate global variables
 #
 #  Usage:
-#    A script is provided at the end for usage of the functions
+#    A test script is provided at the end for usage of the functions.
+#    See how-to-use_dev.py for examples with more detailed comments.
 #
 #===============================================================================
 # 
