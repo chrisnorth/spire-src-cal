@@ -229,7 +229,8 @@ class Source(object):
     def calcProfile(self,radArr):
         #run calcProfile associated with typeTemplate
         srcProf=self.typeTemplate.calcProfile(radArr,self.params)
-        return(SourceProfile(radArr,srcProf,None,self))
+        newProf=SourceProfile(radArr,srcProf,None,self,key='%s_Profile'%self.key)
+        return(newProf)
 
     def calcArea(self):
         #run calcArea associated with typeTemplate
@@ -625,16 +626,17 @@ class LinConstSourceType(SourceType):
 #===============================================================================
 #-------------------------------------------------------------------------------
 class SourceProfile(object):
-    def __init__(self,radArr=None,profile=None,error=None,originator=None):
+    def __init__(self,radArr=None,profile=None,error=None,originator=None,key=None):
         #set radArr
         self.setRadArr(radArr)
         #set profile
-        self.profile=Double1d(profile) or None
+        self.setProfile(profile)
         self.setError(error)
         #check radArr and profile are compatible
         self.check()
         #set original Source object
         self.setOrig(originator)
+        self.setKey(key)
 
     def setRadArr(self,radArr=None):
         #set radArr, nRad and maxRad
@@ -645,7 +647,27 @@ class SourceProfile(object):
         else:
             self.nRad=0
             self.maxRad=Double.NaN
+            
+        return(self)
 
+    def setProfile(self,profile=None):
+        #set error
+        if self.radArr==None:
+            #no radArr
+            assert error==None,\
+              'cannot set profile without radArr'
+            self.profile=None
+        else:
+            #radArr exists
+            if profile==None:
+                #make blank array
+                self.profile=Double1d(self.nRad)
+            else:
+                assert len(profile)==self.nRad,\
+                  'profile array must be same length as rad array'
+                self.profile=profile
+        return(self)
+        
     def setError(self,error=None):
         #set error
         if self.radArr==None:
@@ -662,7 +684,34 @@ class SourceProfile(object):
                 assert len(error)==self.nRad,\
                   'error array must be same length as rad array'
                 self.error=error
+        return(self)
 
+    def setKey(self,key,fallbackKey=None):
+        if key==None:
+            newKey=fallbackKey
+            #print 'setting fallback key %s'%fallbackKey
+        else:
+            newKey=key
+            #print 'setting key %s'%key
+        self.key=newKey
+        return(self)
+
+    def checkRadArr(self,radArr2):
+        #check whether radius array matches
+        if self.nRad==len(radArr2) and self.maxRad==MAX(radArr2):
+            #arrays have same max and length
+            #take difference of arrays
+            radDiff=self.radArr - radArr2
+            if MIN(radDiff)==0. and MAX(radDiff)==0.:
+                #rad arrays match
+                radMatch=True
+            else:
+                #rad arrays don't exactly match
+                radMatch=False
+        else:
+            #arrays have different length and/or max value
+            radMatch=False
+        return(radMatch)
 
     def check(self):
         #check radArr and profile are both/neither None
@@ -675,20 +724,23 @@ class SourceProfile(object):
               'must set both radArr and profile, or neither'
             assert len(self.radArr)==len(self.profile),\
               'radArr and profile must be of same lengths'%(len(radArr),len(profile))
+        return(self)
 
     def copy(self):
-        new=SourceProfile(radArr=self.radArr,profile=self.profile,error=self.error,originator=self.origSrc)
-        return(new)
+        return(SourceProfile(radArr=self.radArr,profile=self.profile,error=self.error,originator=self.origSrc,key=self.key))
         
-    def generate(self,src,radArr):
-        #generate from Source object
+    def generate(self,src,radArr,key=None):
+        #generate profile from Source object
         self.setRadArr(radArr)
         self.profile=src.calcProfile(radArr)
         #make blank error array
         self.setError(None)
         self.setOrig(src)
+        self.setKey(key,'%s_Profile'%src.key)
+        return(self)
 
     def setOrig(self,src):
+        #set whether profile comes from Source object
         if src:
             self.fromSrc=True
             self.origSrc=src
@@ -697,10 +749,12 @@ class SourceProfile(object):
             self.origSrc=NoneSourceType()
             
     def clearOrig(self):
+        #clear Source object originator
         self.fromSrc=False
         self.origSrc=NoneSourceType()
 
-    def regrid(self,radNew):
+    def regrid(self,radNew,key=None):
+        #interpolate profile to a new radial grid
         #create interpolation objects
         profInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.profile))
         errInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.error))
@@ -715,43 +769,64 @@ class SourceProfile(object):
         errNew=Double1d(nRadNew)
         profNew[iR]=profInterp(radNew[iR])
         errNew[iR]=errInterp(radNew[iR])
-        return(SourceProfile(radNew,profNew,errNew))
+        newProf=self.copy()
+        newProf.setRadArr(radNew)
+        newProf.setProfile(profNew)
+        newProf.setError(errNew)
+        if self.key==None:
+            newProf.setKey(key)
+        else:
+            newProf.setKey(key,'%s_regrid'%self.key)
         
-    def normProf(self):
+        return(newProf)
+        
+    def normProf(self,key=None):
         #normalise such that profile=1 at r=0
         prof0=self.profile[0]
         newProf=self.copy()
         newProf.profile=self.profile/prof0
         newProf.error=self.error/prof0
         newProf.clearOrig()
+        if self.key==None:
+            newProf.setKey(key)
+        else:
+            newProf.setKey(key,'%s_normProf%g'%(self.key,prof0))
         return(newProf)
         
-    def normArea(self):
+    def normArea(self,key=None):
         #normalise such that area=1
         area0=self.calcArea(forceNumerical=True)
-        print 'area0=',area0
+        #print 'area0=',area0
         newProf=self.copy()
         newProf.profile=self.profile/area0
         newProf.error=self.error/area0
         newProf.clearOrig()
-        print 'new area=',newProf.calcArea()
+        #print 'new area=',newProf.calcArea()
+        if self.key==None:
+            newProf.setKey(key)
+        else:
+            newProf.setKey(key,'%s_normArea%g'%(self.key,area0))
         return(newProf)
 
     def calcArea(self,forceNumerical=False,forceAnalytical=False):
         #print 'calc area'
         if forceNumerical:
+            #use the numerial integration method
             doNum=True
         elif forceAnalytical:
+            #calculate analytically from the Source originator
             doNum=False
             if self.fromSrc:
                 srcArea=self.origSrc.calcArea()
             else:
                 srcArea=Double.NaN()
         else:
+            #calculate from source if possible, else use numerical integration
             if self.fromSrc:
                 #try to get analytical area from origSrc
                 srcArea=self.origSrc.calcArea()
                 if Double.isNaN(srcArea):
+                    #can't calculate analytically
                     doNum=True
                 else:
                     doNum=False
@@ -780,7 +855,7 @@ class SourceProfile(object):
         else:
             if self.fromSrc:
                 #try to get analytical area from origSrc
-                srcArea=self.origSrc.calcFwhm()
+                srcFwhm=self.origSrc.calcFwhm()
                 if Double.isNaN(srcFwhm):
                     doNum=True
                 else:
@@ -815,7 +890,7 @@ class SourceProfile(object):
 
         return(srcFwhm)
         
-    def add(self,prof2,err2=None):
+    def add(self,prof2,err2=None,key=None):
         #add profile to another
         newProf=self.copy()
         if type(prof2)==SourceProfile:
@@ -825,6 +900,11 @@ class SourceProfile(object):
             newProf.profile = self.profile + prof2Regrid.profile
             #add errors in quadrature
             newProf.error = SQRT(self.error**2 + prof2Regrid.error**2)
+            #set key
+            if self.key==None or prof2.key==None:
+                newProf.setKey(key)
+            else:
+                newProf.setKey(key,'%s_ADD_%s'%(self.key,prof2.key))
         else:
             #check whether prof2 is scalar of array
             try:
@@ -844,6 +924,8 @@ class SourceProfile(object):
             
             #add profiles
             newProf.profile = self.profile + prof2
+            #set key
+            newProf.setKey(key)
             
             if error!=None:
             #check whether err2 is scalar of array
@@ -866,7 +948,7 @@ class SourceProfile(object):
         
         return(newProf)
         
-    def mult(self,prof2):
+    def mult(self,prof2,key=None):
         #multiply profile by another
         newProf=self.copy()
         
@@ -877,6 +959,11 @@ class SourceProfile(object):
             newProf.profile = self.profile * prof2Regrid.profile
             #add relative errors in quadrature
             newProf.error = newProf.profile * SQRT((self.error/self.profile)**2 + (prof2Regrid.error/prof2Regrid.profile)**2)
+            #set key
+            if self.key==None or prof2.key==None:
+                newProf.setKey(key)
+            else:
+                newProf.setKey(key,'%s_MULT_%s'%(self.key,prof2.key))
         else:
             #check whether prof2 is scalar of array
             try:
@@ -893,39 +980,14 @@ class SourceProfile(object):
             
             #multiply profiles and errors
             newProf.profile = self.profile * prof2
+            #set key
+            newProf.setKey(key)
+            #set error
             newProf.error = self.error * prof2
         #no longer based on SourceType
-        newProf.origSrc=NoneSourceType()
-        newProf.fromSrc=False
+        newProf.clearOrig()
         
         return(newProf)
-
-    def rad2k(self):
-        #make k-array
-        maxRad=self.nRad
-        minK=(PI/maxRad)
-        nK=self.nRad/2
-        kArr=Double1d(range(nK))*minK
-        #for k in range(len(kArr)-1):
-        #    #print k,radArr[(nRad-1)-k]
-        #    kArr[k+1]=PI/self.radArr[(self.nRad-1)-k]
-        return(kArr)
-
-    def calcRft(self):
-        #compute Radial-Fourier Transform (RFT) of source profile
-        #make k-array
-        kArr=self.rad2k()
-        nK=len(kArr)
-        rftProfile=Double1d(nK)
-        integrator=TrapezoidalIntegrator(0.,self.maxRad)
-        profInterp=CubicSplineInterpolator(self.radArr,self.profile)
-        for k in range(nK):
-            rftArg_k=rftArg(kArr[k],profInterp)
-            print 'rft arg calculated:',k,kArr[k]
-            rftProfile[k]=integrator.integrate(rftArg_k)
-            print 'rft integral calculated:',rftProfile[k]
-            #print k,kArr[k],rftProfile[k]
-        return(RftProfile(kArr,rftProfile))
         
     def makeImage(self):
         #make image of source
@@ -991,6 +1053,7 @@ class SourceProfile(object):
     
     def __str__(self):
         result='%s'%self.__class__
+        result=result+'\nKey=%s'%self.key
         result=result+'\nnRad=%d'%self.nRad
         if self.nRad > 0:
             result=result+'\nmaxRad=%g'%self.maxRad
@@ -1005,56 +1068,8 @@ class SourceProfile(object):
                 result=result+'\norigSrc: %s'%self.origSrc.key
         return(result)
 
-#-------------------------------------------------------------------------------
-#===============================================================================
-#=====                       DEFINE RftProfile CLASS                     =====
-#===============================================================================
-#-------------------------------------------------------------------------------
-class RftProfile(object):
-    def __init__(self,kArr=None,rftProfile=None):
-        self.setKArr(kArr)
-        self.rft=rftProfile or None
-        
-    def setKArr(self,kArr=None):
-        self.kArr=kArr or None
-        if self.kArr:
-            self.nK=len(kArr)
-            self.maxK=MAX(self.kArr)
 
-    def generate(self,src,kArr):
-        self.kArr=kArr
-        self.nK=len(self.kArr)
-        
-        radArr=self.k2rad()
-        realProfile=Profile().generate(src,radArr)
-        self.rft=realProfile.calcRft()
-    
-    def k2rad(self):
-        #make k-array
-        radArr=Double1d(self.nK)
-        nR=len(radArr)
-        for r in range(nR-1):
-            #print k,radArr[(nRad-1)-k]
-            radArr[r+1]=PI/self.kArr[(self.nK-1)-r]
-        return(radArr)
-        
-    def calcInvRft(self):
-        #compute Radial-Fourier Transform (RFT) of source profile
-        #make k-array
-        radArr=self.k2rad()
-        nRad=len(radArr)
-        realProfile=Double1d(self.nK)
-        integrator=TrapezoidalIntegrator(0.,self.maxK)
-        rftInterp=CubicSplineInterpolator(self.kArr,self.rft)
-        for r in range(nRad):
-            profArg_x=rftArg(radArr[r],rftInterp)
-            print 'inv-rft arg calculated:',r,radArr[r]
-            realProfile[r]=integrator.integrate(profArg_x)
-            print 'inv-rft integral calculated:',realProfile[r]
-            #print r,radArr[r],realProfile[r]
-        return(radArr,realProfile)
-
-def convolveProfiles(profile1,profile2):
+def convolveProfiles(profile1,profile2,key=None):
     assert type(profile1)==SourceProfile,'profile1 must be SourceProfile object'
     assert type(profile2)==SourceProfile,'profile2 must be SourceProfile object'
     
@@ -1089,6 +1104,11 @@ def convolveProfiles(profile1,profile2):
     convolvedImage=imageConvolution(image1,image2)
     #compute profile of convolved image)
     convolvedProfile=image2ProfCirc(convolvedImage)
+    #set key
+    if profile1.key==None or profile2.key==None:
+        convolvedProfile.setKey(key)
+    else:
+        convolvedProfile.setKey(key,'%s_CONV_%s'%(profile1.key,profile2.key))
     return(convolvedProfile)
 
 def image2ProfCirc(imageIn):
@@ -1105,7 +1125,7 @@ def image2ProfCirc(imageIn):
         error=None
     return(SourceProfile(radArr,profile,error))
 
-def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,dRadArcsec=None,verbose=False):
+def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,dRadArcsec=None,key=None,verbose=False):
     #general script to take a position in a map and create a radial source profile
     assert type(mapIn)==SimpleImage,'mapIn must be a SimpleImage'
     if raCtr!=None and decCtr!=None:
@@ -1255,37 +1275,10 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
             errProf[r]=sdRad
         #print r,rad,sum(histThis),sum(histDiff),radProf[r]
         
-    return([SourceProfile(radArr,radProf,errProf),mapCrop])
-    
-#def testJ0():
-#    #make test arrays of 0th order Bessel functions
-#    xarr=Float1d(range(0,2000))/100.
-#    nX=len(xarr)
-#    J0arr=Double1d(nX)
-#    for x in range(nX):
-#        J0arr[x]=calcJ0(xarr[x])
-#    return(xarr,J0arr)
-    
-class j0arg(RealFunction):
-    #returns COS(z * COS(theta)) for use in Bessel functions
-    def __init__(self,z):
-        self.z=z
-    def calc(self,theta):
-        return COS(self.z*COS(theta))        
+    #make profile
+    profMap=SourceProfile(radArr,radProf,errProf)
+    #set key
+    profMap.setKey(key)
+    return([profMap,mapCrop])
 
-def calcJ0(z):
-    #calculate J0 Bessel function at value z (z=kR)
-    #J= (1/pi) * int_0^pi{cos(z cos(x)) dx}
-    integrator=TrapezoidalIntegrator(0.,PI)
-    j0Arg_z=j0arg(z)
-    j0=integrator.integrate(j0Arg_z) / PI
-    return(j0)
-    
-class rftArg(RealFunction):
-    #returns J0(k*r) * radInt(r)
-    def __init__(self,k,radInt):
-        self.k=k
-        self.radInt=radInt
-    def calc(self,r):
-        return (calcJ0(self.k*r)*self.radInt(r))
     
