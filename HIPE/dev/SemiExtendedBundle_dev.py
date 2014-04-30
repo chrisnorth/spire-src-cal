@@ -94,7 +94,7 @@ from SpireHandbookBundle_dev import spireBands
 #-------------------------------------------------------------------------------
 
 
-def calcBeamSrcMonoArea(src,verbose=False):
+def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
     """
     ========================================================================
     calcBeamSrcMonoArea(src,verbose=False):
@@ -104,8 +104,11 @@ def calcBeamSrcMonoArea(src,verbose=False):
           once per source
 
     Inputs:
-      src:     (Source) Source object to multiply beam profile by
-      verbose: (boolean) print more information. Default=False
+      src:         (Source class) Source object to multiply beam profile by
+                   OR
+                   (SourceProfile class) Source profile object to multiply beam profile by
+      verbose:     (boolean) print more information. Default=False
+      forceRecalc: (boolean) force recalculation of profile, even if already stored
 
     Outputs:     
       (dict) Monochromatic beam areas over frequency raster.
@@ -140,60 +143,87 @@ def calcBeamSrcMonoArea(src,verbose=False):
 
     global beamMonoSrcArea
 
-    try:
-        beamMonoSrcArea[src.key]
-        if (verbose):print'Using existing monochromatic areas (key %s)'%src.key
-        #exists, don't recalculate
-    except:
-        #doesn't exist, recalculate
-        #check if main structure exists
-        try:
-            beamMonoSrcArea
-            #exists, don't create
-        except:
-            #doesn't exist, must create
-            beamMonoSrcArea={}
-                
-        beamProfs = sh.getCal().getProduct("RadialCorrBeam")
-        beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-        #define srcProf to be same length as beamRad
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src mus be either Source or SourceProfile object'
+    #read in beamProfiles
+    beamProfs = sh.getCal().getProduct("RadialCorrBeam")
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+
+    if type(src)==srcMod.Source:
+        #create source profile
+        
+        fromSrc=True
         srcProf=src.calcProfile(beamRad)
-        if src.scaleWidth<beamRad[10]:
+        if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
+        
+    elif type(src)==srcMod.SourceProfile:
+        fromSrc=False
+        srcProf=src.copy()
+
+    if srcProf.key!=None:
+        #store in beamMonoSrcArea global variable        
+        try:
+            beamSrcArea=beamMonoSrcArea[srcProf.key]
+            if (verbose):print'Using existing monochromatic areas (key %s)'%srcProf.key
+            #exists, only recalculate if forced
+            reCalc=forceRecalc
+        except:
+            #doesn't exist, recalculate
+            reCalc=True
+            #check if main structure exists
+            try:
+                beamMonoSrcArea
+                #exists, don't create
+            except:
+                #doesn't exist, must create
+                beamMonoSrcArea={}
+    else:
+        #no key
+        reCalc=True
+    
+    if reCalc:
+        beamSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        if srcProf.calcFwhm()<beamRad[10]:
             #quite a small source (< 10 steps in radius array)
             beamProfsFine=fineBeam(beamProfs,src.scaleWidth)
             beamRadFine=beamProfsFine.getCoreCorrectionTable().getColumn('radius').data
             #define srcProfFine to be same length as beamRadFine
-            srcProfFine=src.calcProfile(beamRadFine)
+            srcProfFine=srcProf.regrid(beamRadFine)
             srcAreaFine=srcProfFine.calcArea()*sh.arcsec2Sr()
-            beamMonoSrcArea[src.key] = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-            if src.scaleWidth<beamRad[1]:
+            if srcProf.calcFwhm()<beamRad[2] and fromSrc==True:
                 #VERY small (scale width < 1 step in radius array)
-                if (verbose):print 'Very small source [%g arcsec]. Using source area only (ignoring beam)'%src.scaleWidth
+                if (verbose):print 'Very small source [FWHM=%g arcsec]. Using source area only (ignoring beam)'%srcProf.calcFwhm()
                 for band in spireBands():
                     spireFreq=sh.getSpireFreq()
-                    beamMonoSrcArea[src.key][band]=Double1d(len(spireFreq),srcAreaFine)
+                    beamSrcArea[band]=Double1d(len(spireFreq),srcAreaFine)
             else:
                 #quote small source (scale width 1-10 steps in radius array
+                if (verbose):print 'Calculating monochromatic beam areas for small [FHWM=%g arcsec] %s SourceProfile'%(srcProf.calcFwhm(),src.key)
                 for band in spireBands():
-                    if (verbose):print 'Calculating monochromatic beam areas for small [%g arcsec] %s source for %s band'%(src.scaleWidth,src.key,band)
                     #monochromatic beam areas
                     gamma = beamProfsFine.meta['gamma'].double
-                    beamMonoSrcArea[src.key][band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfsFine, 
+                    beamSrcArea[band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfsFine, 
                       sh.getSpireEffFreq()[band], gamma, srcProfFine, band)
-                
         else:
             #calculate area of beam and source
             gamma = beamProfs.meta['gamma'].double
-            beamMonoSrcArea[src.key] = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+            if (verbose):print 'Calculating monochromatic beam areas for %s SourceProfile'%(srcProf.key)
+            if srcProf.checkRadArr(beamRad)==False:
+                #regrid to match beam profile
+                srcProfRegrid=srcProf.regrid(beamRad)
+                if (verbose):print 'Regridding %s SourceProfile to match beam profile'
+            else:
+                srcProfRegrid=srcProf.copy()
             for band in spireBands():
-                if (verbose):print 'Calculating monochromatic beam areas for %s source for %s band'%(src.key,band)
                 #monochromatic beam areas
-                beamMonoSrcArea[src.key][band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfs, 
-                  sh.getSpireEffFreq()[band], gamma, srcProf, band)
-            
-        
-        if (verbose):print 'All beam areas calculated for %s source'%src.key        
-    return beamMonoSrcArea[src.key]
+                beamSrcArea[band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfs, 
+                  sh.getSpireEffFreq()[band], gamma, srcProfRegrid, band)
+
+    if srcProf.key!=None:
+        #store in global variable
+        beamMonoSrcArea[srcProf.key]=beamSrcArea
+    #if (verbose):print 'All beam areas calculated for %s source'%src.key
+    return (beamSrcArea)
 
 def fineBeam(beamProfsIn,scaleWidth,verbose=False):
     """
@@ -279,7 +309,9 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
 
     Inputs:
         alphaK:  (scalar/float array) Spectral index(es) to use
-        src:     (Source object class) Source object to use
+        src:     (Source class) Source object to use
+                 OR
+                 (SourceProfile class) SourceProfile object to use
         verbose: (boolean) Set to print more information. Default=True.
         table:   (boolean) Set to output TableDataset. Default=False.
 
@@ -322,6 +354,10 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
 
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
     k4P=sh.calcK4P()
     print 'k4P:',k4P
     try:
@@ -330,13 +366,16 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
     except:
         aList=False
 
-    #calculate source area analytically
+    #calculate source area analytically (if possible)
     srcArea=src.calcArea()
     if Double.isNaN(srcArea):
-        #make profile and integrate
-        beamRad=sh.getCal().getProduct("RadialCorrBeam").getCoreCorrectionTable().getColumn('radius').data
-        srcArea=src.calcProfile(radArr).calcArea()
+        #calculate SourceProfile from src (if necessary)
+        if type(src)==Source:
+            #make profile and integrate
+            beamRad=sh.getCal().getProduct("RadialCorrBeam").getCoreCorrectionTable().getColumn('radius').data
+            srcArea=src.calcProfile(beamRad).calcArea()
 
+    assert (not Double.isNaN(srcArea)),'Problem calculating source are for %s (%s)'%(src.key,type(src))
     if not aList:
         # alphaK is scalar
         kColPSrc = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
@@ -387,7 +426,9 @@ def calcKColPSrc_BB(betaK,tempK,src,verbose=False,table=False):
     Inputs:
         betaK:   (float) Emmisivity spectral index to use
         tempK:   (scalar/float array) Temperature(s) to use
-        src:     (Source object class) Source object to use
+        src:     (Source class) Source object to use
+                 OR
+                 (SourceProfile class) SourceProfile object to use
         verbose: (boolean) Set to print more information. Default=True.
         table:   (boolean) Set to output TableDataset. Default=False.
 
@@ -430,6 +471,10 @@ def calcKColPSrc_BB(betaK,tempK,src,verbose=False,table=False):
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
 
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
     k4P=sh.calcK4P()
     print 'k4P:',k4P
     try:
@@ -438,13 +483,17 @@ def calcKColPSrc_BB(betaK,tempK,src,verbose=False,table=False):
     except:
         tList=False
 
-    #calculate source area analytically
+    #calculate source area analytically (if possible)
     srcArea=src.calcArea()
     if Double.isNaN(srcArea):
-        #make profile and integrate
-        beamRad=sh.getCal().getProduct("RadialCorrBeam").getCoreCorrectionTable().getColumn('radius').data
-        srcArea=src.calcProfile(radArr).calcArea()
+        #calculate SourceProfile from src (if necessary)
+        if type(src)==Source:
+            #make profile and integrate
+            beamRad=sh.getCal().getProduct("RadialCorrBeam").getCoreCorrectionTable().getColumn('radius').data
+            srcArea=src.calcProfile(beamRad).calcArea()
 
+    assert (not Double.isNaN(srcArea)),'Problem calculating source are for %s (%s)'%(src.key,type(src))
+    
     if not tList:
         # tempK is scalar
         kColPSrc_BB = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
@@ -495,7 +544,9 @@ def calcKColESrc(alphaK,src,verbose=False,table=False):
 
     Inputs:
         alphaK:  (scalar/float array) Spectral index(es) to use
-        src:     (Source object class) Source object to use
+        src:     (Source class) Source object to use
+                 OR
+                 (SourceProfile class) SourceProfile object to use
         verbose: (boolean) Set to print more information. Default=True.
         table:   (boolean) Set to output TableDataset. Default=False.
 
@@ -535,6 +586,10 @@ def calcKColESrc(alphaK,src,verbose=False,table=False):
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
 
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
     k4E_Tot=sh.calcKMonE()
     print 'k4E_Tot:',k4E_Tot
     try:
@@ -586,7 +641,9 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
     Inputs:
         betaK:   (float) Emmisivity spectral index to use
         tempK:   (scalar/float array) Temperature(s) to use
-        src:     (Source object class) Source object to use
+        src:     (Source class) Source object to use
+                 OR
+                 (SourceProfile class) SourceProfile object to use
         verbose: (boolean) Set to print more information. Default=True.
         table:   (boolean) Set to output TableDataset. Default=False.
 
@@ -626,6 +683,10 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
     #freq=getSpireFreq()
     #spireFilt=getSpireFilt(cal)
 
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
     k4E_Tot=sh.calcKMonE()
     print 'k4E_Tot:',k4E_Tot
     try:
@@ -679,7 +740,9 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
         alphaK:   (float) power law spectral index to use
         aperture: (list float) source apperture radius (in arcsec) for each band.
                     Default=[22., 30.,45.]
-        src:     (Source object class) Source object to use
+        src:      (Source class) Source object to use
+                  OR
+                  (SourceProfile class) SourceProfile object to use
         annulus:  (list float) background annulus radius (in arcsec) for each band
                     Either 2-element list (uses same for each band), or list of 
                     three 2-element lists. Default=[60.,90.]
@@ -710,6 +773,9 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
         herschel.ia.dataset.TableDataset()
     """
     
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
     #read aperture from input
     assert type(aperture)==list,'aperture must be 3-element list'
     assert len(aperture)==3,'aperture must be 3-element list'
@@ -755,8 +821,16 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     #setup integrator over whole beam
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
-    #calculate SourceProfile from src, normalised to total area 1.
-    srcProf=src.calcProfile(beamRad)
+    #calculate SourceProfile from src (if necessary)
+    if type(src)==Source:
+        srcProf=src.calcProfile(beamRad)
+    else:
+        if src.checkRadArr(beamRad):
+            srcProf=src.regrid(beamRad)
+        else:
+            srcProf=src.copy()
+        
+    #normalised to total area 1.
     srcProfNorm=srcProf.normArea()
     srcArea=srcProf.calcArea(forceNumerical=True)
     srcAreaNorm=srcProfNorm.calcArea(forceNumerical=True)
@@ -952,11 +1026,15 @@ def semiExtendedTest():
     
     for wid in srcWidths:
         src=srcMod.Source('Gaussian',[wid])
-        #calculate flux density colour correction
+        #calculate colour corrections from source
         KColP_partial=calcKColPSrc(alphaK,src,verbose=True,table=False)
-        #calculate surface brightness colour correction
         KColE_partial=calcKColESrc(alphaK,src,verbose=True,table=False)
-        
+
+        #calculate colour corrections from source profile
+        srcProf=src.calcProfile(Float1d(range(700)))
+        KColP_partial=calcKColPSrc(alphaK,srcProf,verbose=True,table=False)
+        KColE_partial=calcKColESrc(alphaK,srcProf,verbose=True,table=False)
+
         KColP_partialPSW.append(KColP_partial['PSW'])
         KColP_partialPMW.append(KColP_partial['PMW'])
         KColP_partialPLW.append(KColP_partial['PLW'])
@@ -995,14 +1073,5 @@ def testApCorr():
     apCorrNoBGSrc=[Float1d(apCorrNoBG_partialPSW),Float1d(apCorrNoBG_partialPMW),Float1d(apCorrNoBG_partialPLW)]
     
     return(srcWidths,apCorrIncBGSrc,apCorrNoBGSrc)
-    
-def testRft():
-    srcWidth=30.
-    src=srcMod.Source('Gaussian',srcWidth)
-    radArr=Double1d(range(700))
-    srcProf=src.calcProfile(radArr)
-    srcRft=srcProf.calcRft()
-    return(srcProf,srcRft)
-    #srcProfInv=srcRft.calcInvRft()
-    #return(srcProf,srcRft,srcProfInv)
+
     

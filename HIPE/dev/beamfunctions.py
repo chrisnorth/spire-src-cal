@@ -615,7 +615,7 @@ def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,arr
     beamNew[isConst]=beamConst[isConst]
 
     #copy source Profile and multiply by beam
-    beamNew = srcProf.copy().mult(beamNew)
+    beamNew = srcProf.copy().mult(beamNew,key='Src x Beam')
     beamMonoArea = beamNew.calcArea()
     
     if beamMonoArea==0:
