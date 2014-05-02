@@ -50,13 +50,14 @@
 #  range of source spectra, and for both point sources and extended sources
 # 
 #  The following global variables are defined and used:
-#         spireCalPhot: [context] Spire Calibration Context for Photometer
-#         spireFreq:    [float array] frequency raster across all bands
-#         spireRefFreq: [dict] SPIRE reference frequencies (1 scalar per band)
-#         spireEffFreq: [dict] SPIRE effective frequencies (1 scalar per band)
-#         spireFiltOnly:[dict] filter profile without aperture efficiency (1 array per band)
-#         spireFilt:    [dict] filter profile with aperture efficiency (1 array per band)
-#         beamMonoArea: [dict] SPIRE monochromatic areas (1 array per bands, plus 'beamType')
+#         spireCalPhot:  [context] Spire Calibration Context for Photometer
+#         spireFreq:     [float array] frequency raster across all bands
+#         spireRefFreq:  [dict] SPIRE reference frequencies (1 scalar per band)
+#         spireEffFreq:  [dict] SPIRE effective frequencies (1 scalar per band)
+#         spireFiltOnly: [dict] filter profile without aperture efficiency (1 array per band)
+#         spireFilt:     [dict] filter profile with aperture efficiency (1 array per band)
+#         beamMonoArea:  [dict] SPIRE monochromatic areas (1 array per bands, plus 'beamType')
+#         spireEffBeams: [dict] SPIRE effective beam peofiles (1 per spectrum)
 #
 #  The functions are as follows:
 #  * spireBands:
@@ -135,6 +136,27 @@
 #      - Global variables used:
 #          beamMonoArea [dict] SPIRE monochromatic areas (1 array per band + beamType)
 #
+#   * calcSpireEffBeam:
+#      Calculates effective beam profile for power law spectrum.
+#      - Inputs:
+#          alphaK:  [float] power law spectral index (scalar or list)
+#          verbose: [boolean] Set to print more information to terminal
+#      - Outputs:
+#          [dict] SPIRE effective beam aprofile (1 Double1d per band)
+#      - Global variables used:
+#          spireEffBeams [dict] SPIRE monochromatic areas (1 per spectrum)
+#
+#   * calcSpireEffBeam_BB:
+#      Calculates effective beam profile for modified black body spectrum.
+#      - Inputs:
+#          betaK:   [float] modBB emissivity index
+#          tempK:   [float] modBB temperature
+#          verbose: [boolean] Set to print more information to terminal
+#      - Outputs:
+#          [dict] SPIRE effective beam profiles (1 Double1d per band)
+#      - Global variables used:
+#          spireEffBeams [dict] SPIRE monochromatic areas (1 per spectrum)
+#
 #   * calcOmegaEff:
 #      Calculates effective beam area for power law spectrum.
 #      - Inputs:
@@ -150,7 +172,7 @@
 #      Calculates effective beam area for modified blackbody spectrum.
 #      - Inputs:
 #          betaK: [float] modBB emissivity index
-#          tempK: [float/list)] modBB temperature (scalar or list)
+#          tempK: [float/list] modBB temperature (scalar or list)
 #          verbose: [boolean] Set to print more information to terminal
 #          table:   [boolean] Set to output TableDataset
 #      - Outputs:
@@ -1239,6 +1261,169 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array, BB=False,temp=2
 #===============================================================================
 #-------------------------------------------------------------------------------
 
+def calcSpireEffBeam(alphaK,verbose=False):
+
+    key='alpha_%g'%alphaK
+    
+    global spireEffBeams
+    
+    try:
+        effBeams=spireEffBeams[key]
+        if verbose: print 'Using existing effective beams for alpha %.2f'%(alphaK)
+    except:
+        try:
+            spireEffBeams
+        except:
+            spireEffBeams={}
+            
+        effBeams={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+    
+        if verbose: print 'Calculating effective beams for alpha %.2f'%(alphaK)
+        freq=getSpireFreq()
+        fSky  = freq**alphaK
+                
+        beamProfs=getCal().getProduct('RadialCorrBeam')
+        beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+        effFreq=getSpireEffFreq()
+        gamma=beamProfs.meta['gamma'].double
+
+        #integrate transm*fSky over frequency for nomalisation
+        integrator=TrapezoidalIntegrator(MIN(freq),MAX(freq))
+        for band in spireBands():
+            transm=getSpireFilt(rsrfOnly=True)[band]
+            denomInterp=CubicSplineInterpolator(freq,transm*fSky)
+            denomInteg=integrator.integrate(denomInterp)
+            #get core beam profile from calibration table
+            beamCore=beamProfs.getCoreCorrectionTable().getColumn(band).data
+            #create interpolation object
+            beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+            
+            #make array for new beam
+            nRad=len(beamRad)
+            maxRad=max(beamRad)
+            effBeams[band]=Double1d(beamRad)
+            #loop over radius
+            for r in range(nRad):
+                #calculate the "scaled" radius for range of frequencies
+                radFreq=beamRad[r]*(freq/effFreq[band])**-gamma
+                #ensure it doesn't fo beyong maximum radius
+                radFreq[radFreq.where(radFreq > maxRad)]=maxRad
+                #compute value beam profile at each scaled radius
+                beamCoreFreq=beamCoreInt(radFreq)
+                #apply constant beam profile value where appropriate
+                beamConstRad=beamProfs.getConstantCorrection(beamRad[r],band)
+                isConst=beamCoreFreq.where(beamCoreFreq < beamConstRad)
+                beamCoreFreq[isConst]=beamConstRad
+        
+                #integrate beamCoreFreq*transm*fSky over frequency
+                numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+                numInteg = integrator.integrate(numInterp)
+        
+                #write value into table
+                effBeams[band][r]=numInteg/denomInteg    
+
+        #store in global variable
+        spireEffBeams[key]=effBeams
+    return(effBeams)
+    
+def calcSpireEffBeam_BB(betaK,tempK,verbose=False):
+    """
+    ================================================================================
+    calcSpireEffBeam_BB(betaK,tempK,verbose=False):
+        Calculated effective beam area for modified blackbody spectrum.
+        Stores result in global variable e
+
+    Inputs:
+        alphaK:  (scalar/float array) Spectral index(es) to use
+        verbose: (boolean) Set to print more information. Default=True.
+    Outputs:
+        (dict) effective beam profiles (one per band)
+                    
+    Calculation:
+        [See Handbook Eq 5.32-34]
+        Integrates monochromatic beam profile over frequency raster, weighted by
+          spire filter profiles and source spectrum
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        getSpireFreq() - get frequency raster
+        getSpireEffFreq() - get spire effective frequencies
+        getCal() - retrieve calibration tree
+        getSpireFilt() - get spire Filter profiles
+        calcBeamMonoArea() - calculate monochromatic beam areas
+        spireEffArea - calculate effective beam area
+        herschel.ia.dataset.TableDataset()
+    """
+    key='beta_%g_temp_%g'%(betaK,tempK)
+    
+    global spireEffBeams
+    
+    try:
+        effBeams=spireEffBeams[key]
+        if verbose: print 'Using existing effective beams for beta %.2f and temp %.2f'%(betaK,tempK)
+    except:
+        try:
+            spireEffBeams
+        except:
+            spireEffBeams={}
+            
+        effBeams={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        
+        h = Constant.H_PLANCK.value
+        k = Constant.K_BOLTZMANN.value
+        c = Constant.SPEED_OF_LIGHT.value
+    
+        if verbose: print 'Calculating effective beams for beta %.2f and temp %.2f'%(betaK,tempK)
+        freq=getSpireFreq()
+        fSky  = 2*h * freq**3 / c**2 / (EXP(h*freq/k/tempK) - 1.) * freq**betaK
+                
+        beamProfs=getCal().getProduct('RadialCorrBeam')
+        beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+        effFreq=getSpireEffFreq()
+        gamma=beamProfs.meta['gamma'].double
+
+        #integrate transm*fSky over frequency for nomalisation
+        integrator=TrapezoidalIntegrator(MIN(freq),MAX(freq))
+        
+        for band in spireBands():
+            transm=getSpireFilt(rsrfOnly=True)[band]
+            denomInterp=CubicSplineInterpolator(freq,transm*fSky)
+            denomInteg=integrator.integrate(denomInterp)
+
+            #get core beam profile from calibration table
+            beamCore=beamProfs.getCoreCorrectionTable().getColumn(band).data
+            #create interpolation object
+            beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+        
+            #make array for new beam
+            nRad=len(beamRad)
+            maxRad=max(beamRad)
+            effBeams[band]=Double1d(beamRad)
+            #loop over radius
+            for r in range(nRad):
+                #calculate the "scaled" radius for range of frequencies
+                radFreq=beamRad[r]*(freq/effFreq[band])**-gamma
+                #ensure it doesn't fo beyong maximum radius
+                radFreq[radFreq.where(radFreq > maxRad)]=maxRad
+                #compute value beam profile at each scaled radius
+                beamCoreFreq=beamCoreInt(radFreq)
+                #apply constant beam profile value where appropriate
+                beamConstRad=beamProfs.getConstantCorrection(beamRad[r],band)
+                isConst=beamCoreFreq.where(beamCoreFreq < beamConstRad)
+                beamCoreFreq[isConst]=beamConstRad
+        
+                #integrate beamCoreFreq*transm*fSky over frequency
+                numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+                numInteg = integrator.integrate(numInterp)
+        
+                #write value into table
+                effBeams[band][r]=numInteg/denomInteg    
+
+        #store in global variable
+        spireEffBeams[key]=effBeams
+        
+    return(effBeams)
+    
 def calcOmegaEff(alphaK,verbose=False,table=False):
     """
     ================================================================================
@@ -2112,7 +2297,6 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
     #get beam profile from cal product
     beamProfs=getCal().getProduct('RadialCorrBeam')
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-    gamma=beamProfs.meta['gamma'].double
     maxRad=MAX(beamRad)
     #setup integrator over whole beam
     integTot=TrapezoidalIntegrator(0.,maxRad)
@@ -2123,7 +2307,8 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
         #alphaK is scalar
         apCorrNoBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         apCorrIncBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        
+        if verbose:print 'Constructing effective beam profiles for %f:'%(alphaK)
+        effBeams=calcSpireEffBeam(alphaK,verbose=verbose)
         for band in spireBands():
             #create integrators
             integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
@@ -2133,13 +2318,11 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
             sizeAp=integAp.integrate(sizeInterp)
             sizeBG=integBG.integrate(sizeInterp)
             
-            if verbose:print 'Constructing effective beam profile for %s and %f:'%(band,alphaK)
             #calculate effective beam profile
-            effBeam_x=spireEffBeam(getSpireFreq(),getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                getSpireEffFreq()[band],gamma,band,BB=False,alpha=alphaK,verbose=verbose)
+            effBeam_x=effBeams[band]
             
             #interpolate effective beam profile
-            beamInterp = CubicSplineInterpolator(beamRad,effBeam_x['profile'] * 2.*PI*beamRad)
+            beamInterp = CubicSplineInterpolator(beamRad,effBeam_x * 2.*PI*beamRad)
             
             if verbose:print '%s aperture/background sizes:'%band,sizeAp,sizeBG
             #integrate profile to find beam area in aperture/annulus
@@ -2149,9 +2332,9 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
             if verbose:print 'aperture/background beam areas:',omegaAp,omegaBG
             #calculate apertur  ecorrections
             apCorrNoBG[band] = \
-                effBeam_x['area']/omegaAp    
+                omegaTot/omegaAp    
             apCorrIncBG[band] =  \
-                effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
+                omegaTot/(omegaAp - omegaBG*sizeAp/sizeBG)
         if (verbose):
             print 'Calculated apCorr (noBG) for alpha=%f: '%alphaK,apCorrNoBG["PSW"],apCorrNoBG["PMW"],apCorrNoBG["PLW"]
             print 'Calculated apCorr (incBG) for alpha=%f: '%alphaK,apCorrIncBG["PSW"],apCorrIncBG["PMW"],apCorrIncBG["PLW"]
@@ -2161,6 +2344,8 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
         apCorrIncBG={'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         
         for a in range(na):
+            if verbose:print 'Constructing effective beam profiles for %f:'%(alphaK[a])
+            effBeams=calcSpireEffBeam(alphaK[a],verbose=verbose)
             for band in spireBands():
                 #create integrators
                 integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
@@ -2169,23 +2354,21 @@ def calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,tab
                 sizeAp=integAp.integrate(sizeInterp)
                 sizeBG=integBG.integrate(sizeInterp)
                 
-                if verbose:print 'Constructing effective beam profile for %s and %f:'%(band,alphaK[a])
                 #calculate effective beam profile
-                effBeam_x=spireEffBeam(getSpireFreq(),getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                    getSpireEffFreq()[band],gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
+                effBeam_x=effBeams[band]
 
                 #interpolate effective beam profile
-                beamInterp = CubicSplineInterpolator(beamRad,effBeam_x['profile'] * 2.*PI*beamRad)
-            
+                beamInterp = CubicSplineInterpolator(beamRad,effBeam_x * 2.*PI*beamRad)
+
                 #integrate profile to find beam area in aperture/annulus
                 omegaAp=integAp.integrate(beamInterp)
                 omegaBG=integBG.integrate(beamInterp)
                 omegaTot=integTot.integrate(beamInterp)
                 #calculate aperture corrections
                 apCorrNoBG[band][a] = \
-                    effBeam_x['area']/omegaAp    
+                    omegaTot/omegaAp    
                 apCorrIncBG[band][a] =  \
-                    effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
+                    omegaTot/(omegaAp - omegaBG*sizeAp/sizeBG)
             if (verbose):
                 print 'Calculated apCorr (noBG) for alpha=%f: '%alphaK[a],apCorrNoBG["PSW"][a],apCorrNoBG["PMW"][a],apCorrNoBG["PLW"][a]
                 print 'Calculated apCorr (incBG) for alpha=%f: '%alphaK[a],apCorrIncBG["PSW"][a],apCorrIncBG["PMW"][a],apCorrIncBG["PLW"][a]
@@ -2303,7 +2486,8 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
         #alphaK is scalar
         apCorrNoBG_BB={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         apCorrIncBG_BB={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        
+        if verbose:print 'Constructing effective beam profiles for beta=%f, Temp=%f:'%(betaK,tempK)
+        effBeams=calcSpireEffBeam_BB(betaK,tempK,verbose=verbose)
         for band in spireBands():
             #create integrators
             integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
@@ -2313,13 +2497,11 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
             sizeAp=integAp.integrate(sizeInterp)
             sizeBG=integBG.integrate(sizeInterp)
             
-            if verbose:print 'Constructing effective beam profile for %s and beta=%f, Temp=%f:'%(band,betaK,tempK)
             #calculate effective beam profile
-            effBeam_x=spireEffBeam(getSpireFreq(),getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                getSpireEffFreq()[band],gamma,band,BB=True,beta=betaK,temp=tempK,verbose=verbose)
+            effBeam_x=effBeams[band]
             
             #interpolate effective beam profile
-            beamInterp = CubicSplineInterpolator(beamRad,effBeam_x['profile'] * 2.*PI*beamRad)
+            beamInterp = CubicSplineInterpolator(beamRad,effBeam_x * 2.*PI*beamRad)
             
             #integrate profile to find beam area in aperture/annulus
             omegaAp=integAp.integrate(beamInterp)
@@ -2328,9 +2510,9 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
             if verbose:print 'aperture/background beam areas:',omegaAp,omegaBG
             #calculate apertur  ecorrections
             apCorrNoBG_BB[band] = \
-                effBeam_x['area']/omegaAp    
+                omegaTot/omegaAp    
             apCorrIncBG_BB[band] =  \
-                effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
+                omegaTot/(omegaAp - omegaBG*sizeAp/sizeBG)
         if (verbose):
             print 'Calculated apCorr (noBG) for beta %f, %f K: '%(betaK,tempK),apCorrNoBG_BB["PSW"],apCorrNoBG_BB["PMW"],apCorrNoBG_BB["PLW"]
             print 'Calculated apCorr (incBG) for beta %f, %f K: '%(betaK,tempK),apCorrIncBG_BB["PSW"],apCorrIncBG_BB["PMW"],apCorrIncBG_BB["PLW"]
@@ -2340,6 +2522,8 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
         apCorrIncBG_BB={'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
         
         for t in range(nt):
+            if verbose:print 'Constructing effective beam profiles beta=%f, Temp=%f:'%(betaK,tempK[t])
+            effBeams=calcSpireEffBeam_BB(betaK,tempK[t],verbose=verbose)
             for band in spireBands():
                 #create integrators
                 integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
@@ -2348,13 +2532,11 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
                 sizeAp=integAp.integrate(sizeInterp)
                 sizeBG=integBG.integrate(sizeInterp)
                 
-                if verbose:print 'Constructing effective beam profile for %s and beta=%f, Temp=%f:'%(band,betaK,tempK[t])
                 #calculate effective beam profile
-                effBeam_x=spireEffBeam(getSpireFreq(),getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                    getSpireEffFreq()[band],gamma,band,BB=True,beta=betaK,temp=tempK[t],verbose=verbose)
-
+                effBeam_x=effBeams[band]
+                
                 #interpolate effective beam profile
-                beamInterp = CubicSplineInterpolator(beamRad,effBeam_x['profile'] * 2.*PI*beamRad)
+                beamInterp = CubicSplineInterpolator(beamRad,effBeam_x * 2.*PI*beamRad)
             
                 #integrate profile to find beam area in aperture/annulus
                 omegaAp=integAp.integrate(beamInterp)
@@ -2362,9 +2544,9 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
                 omegaTot=integTot.integrate(beamInterp)
                 #calculate aperture corrections
                 apCorrNoBG_BB[band][t] = \
-                    effBeam_x['area']/omegaAp    
+                    omegaTot/omegaAp    
                 apCorrIncBG_BB[band][t] =  \
-                    effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
+                    omegaTot/(omegaAp - omegaBG*sizeAp/sizeBG)
             if (verbose):
                 print 'Calculated apCorr (noBG) for beta %f, %f K: '%(betaK,tempK[t]),apCorrNoBG_BB["PSW"][t],apCorrNoBG_BB["PMW"][t],apCorrNoBG_BB["PLW"][t]
                 print 'Calculated apCorr (incBG) for beta %f, %f K: '%(betaK,tempK[t]),apCorrIncBG_BB["PSW"][t],apCorrIncBG_BB["PMW"][t],apCorrIncBG_BB["PLW"][t]
@@ -2386,9 +2568,10 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
             apCorrNoBG_BB_table.addColumn(band,Column(apCorrNoBG_BB[band]))
             apCorrIncBG_BB_table.addColumn(band,Column(apCorrIncBG_BB[band]))
         return (apCorrIncBG_BB_table,apCorrNoBG_BB_table)
-#
-# test for some parameters
-#
+
+#def clear():
+#    del(spireCalPhot,spireFreq,spireEffFreq,spireRefFreq,spireFilt,spireFiltOnly,monoBeamAreas,spireEffBeams)
+
 def spireColCorrTest(beamType='Full'):
     """
     ================================================================================

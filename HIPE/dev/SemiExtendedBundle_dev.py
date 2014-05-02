@@ -185,7 +185,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
         beamSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         if srcProf.calcFwhm()<beamRad[10]:
             #quite a small source (< 10 steps in radius array)
-            beamProfsFine=fineBeam(beamProfs,src.scaleWidth)
+            beamProfsFine=fineBeam(beamProfs,srcProf.calcFwhm())
             beamRadFine=beamProfsFine.getCoreCorrectionTable().getColumn('radius').data
             #define srcProfFine to be same length as beamRadFine
             srcProfFine=srcProf.regrid(beamRadFine)
@@ -300,6 +300,211 @@ def fineBeam(beamProfsIn,scaleWidth,verbose=False):
         
     return(beamProfs)
 
+def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
+    """
+    ================================================================================
+    calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
+        Calculates effective beam for power law spectrum convolved with source profile
+        Returns beam profile and stores in global variable
+
+    Inputs:
+        alphaK:      (float) power law spectral index to use
+        src:         (Source class) Source object to use
+                     OR
+                     (SourceProfile class) SourceProfile object to use
+        verbose:     (boolean) Set to print more information. Default=True.
+        forceRecalc: (boolean) Set to force recalculation of profiles
+    Outputs:
+        (dict SourceProfile) SourceProfile objects containing convolved beam (one per band)
+                    
+    Calculation:
+      + If corresponding key exists in global variable effBeamSrcProfs and forceRecalc=False:
+          - Returns previously computed profile
+      + If not:
+          - Uses SoruceProfile, or computes SoureProfile from Source object
+          - Calculates effective beam profile and area for given spectrum (can be slow)
+          - Makes maps from source profile and beam map
+          - Convolves maps and converts to SourceProfile object
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        sources_dev.Source
+        sources_dev.SourceProfile
+        SpireHandbookBundle_dev.getCal() - retrieve photometer calibration product
+        SpireHandbookBundle_dev.spireEffBeam() - calculate effective beam
+        sources_dev.convolveProfiles()  -convolve beam profiles
+    """
+    
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
+    #make global variable
+    global effBeamSrcProfs
+
+    #get beam profile from cal product
+    beamProfs=sh.getCal().getProduct('RadialCorrBeam')
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+        
+    if type(src)==srcMod.Source:
+        #create source profile
+        fromSrc=True
+        srcProf=src.calcProfile(beamRad)
+        if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
+        
+    elif type(src)==srcMod.SourceProfile:
+        fromSrc=False
+        srcProf=src.copy()
+        if verbose:print'Using SourceProfile %s'%(srcProf.keyS)
+    
+    
+    if srcProf.key!=None:
+        effBeamKey='%s_alpha%g'%(srcProf.key,alphaK)
+        try:
+            srcConv=effBeamSrcProfs[effBeamKey]
+            if verbose:print 'Using existing convolved beam profile %s'%effBeamKey
+            reCalc=forceRecalc
+            #global variable already defined, so do nothing.
+        except:
+            print 'Calculating convolved beams for %s'%effBeamKey
+            try:
+                effBeamSrcProfs
+                #exists, don't create
+            except:
+                #doesn't exist, must create
+                effBeamSrcProfs={}#not defined, so need to recalculate
+            reCalc=True
+            
+    else:
+        if verbose:print 'no key for SourceProfile. Recalculating'
+        effBeamKey=None
+        reCalc=True
+        
+    if reCalc:
+        gamma=beamProfs.meta['gamma'].double
+        maxRad=MAX(beamRad)
+        nRad=len(beamRad)
+        
+        #make blank variable
+        srcConv={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        #calculate effective beams
+        effBeams=sh.calcSpireEffBeam(alphaK,verbose=verbose)
+        for band in spireBands():
+            if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
+            effBeam_x=effBeams[band]
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key=effBeamKey)            
+            effBeamNormProfile=effBeamProfile.normArea()
+                        
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
+        print str(srcConv)
+        if effBeamKey!=None:
+            effBeamSrcProfs[effBeamKey]=srcConv
+
+    return(srcConv)
+
+def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
+    """
+    ================================================================================
+    calcEffBeamSrc(betaK,tempK,src,verbose=False,forceRecalc=False):
+        Calculates effective beam for modified black body convolved with source profile
+        Returns beam profile and stores in global variable
+
+    Inputs:
+        betaK:       (float) Emmisivity spectral index to use
+        tempK:       (scalar/float array) Temperature to use
+        src:         (Source class) Source object to use
+                     OR
+                     (SourceProfile class) SourceProfile object to use
+        verbose:     (boolean) Set to print more information. Default=True.
+        forceRecalc: (boolean) Set to force recalculation of profiles
+    Outputs:
+        (dict SourceProfile) SourceProfile objects containing convolved beam (one per band)
+                    
+    Calculation:
+      + If corresponding key exists in global variable effBeamSrcProfs and forceRecalc=False:
+          - Returns previously computed profile
+      + If not:
+          - Uses SoruceProfile, or computes SoureProfile from Source object
+          - Calculates effective beam profile and area for given spectrum (can be slow)
+          - Makes maps from source profile and beam map
+          - Convolves maps and converts to SourceProfile object
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        sources_dev.Source
+        sources_dev.SourceProfile
+        SpireHandbookBundle_dev.getCal() - retrieve photometer calibration product
+        SpireHandbookBundle_dev.spireEffBeam() - calculate effective beam
+        sources_dev.convolveProfiles()  -convolve beam profiles
+    """
+    
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+      
+    #make global variable
+    global effBeamSrcProfs
+
+    #get beam profile from cal product
+    beamProfs=sh.getCal().getProduct('RadialCorrBeam')
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+        
+    if type(src)==srcMod.Source:
+        #create source profile
+        fromSrc=True
+        srcProf=src.calcProfile(beamRad)
+        if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
+        
+    elif type(src)==srcMod.SourceProfile:
+        fromSrc=False
+        srcProf=src.copy()
+        if verbose:print'Using SourceProfile %s'%(srcProf.keyS)
+    
+    
+    if srcProf.key!=None:
+        effBeamKey='%s_beta_%g_temp_%g'%(srcProf.key,betaK,tempK)
+        try:
+            srcConv=effBeamSrcProfs[effBeamKey]
+            if verbose:print 'Using existing convolved beam profile %s'%effBeamKey
+            reCalc=forceRecalc
+            #global variable already defined, so do nothing.
+        except:
+            print 'Calculating convolved beams for %s'%effBeamKey
+            try:
+                effBeamSrcProfs
+                #exists, don't create
+            except:
+                #doesn't exist, must create
+                effBeamSrcProfs={}#not defined, so need to recalculate
+            reCalc=True
+            
+    else:
+        if verbose:print 'no key for SourceProfile. Recalculating'
+        effBeamKey=None
+        reCalc=True
+        
+    if reCalc:
+        gamma=beamProfs.meta['gamma'].double
+        maxRad=MAX(beamRad)
+        nRad=len(beamRad)
+        
+        #make blank variable
+        srcConv={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        #calculate effective beams
+        effBeams=sh.calcSpireEffBeam_BB(betaK,tempK,verbose=verbose)
+        for band in spireBands():
+            if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
+            effBeam_x=effBeams[band]
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key=effBeamKey)            
+            effBeamNormProfile=effBeamProfile.normArea()
+                        
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
+        print str(srcConv)
+        if effBeamKey!=None:
+            effBeamSrcProfs[effBeamKey]=srcConv
+
+    return(srcConv)
+
 def calcKColPSrc(alphaK,src,verbose=False,table=False):
     """
     ========================================================================
@@ -368,6 +573,7 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
 
     #calculate source area analytically (if possible)
     srcArea=src.calcArea()
+    print 'source area:',srcArea
     if Double.isNaN(srcArea):
         #calculate SourceProfile from src (if necessary)
         if type(src)==Source:
@@ -732,17 +938,17 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
 def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,table=False):
     """
     ================================================================================
-    calcApCorr(alphaK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,table=False):
-        Calculates aperture corrections for point source with power law spectrum
+    calcApCorr(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,table=False):
+        Calculates aperture corrections for semi-extended source with power law spectrum
         Returns corrections both with and without background annulus
 
     Inputs:
         alphaK:   (float) power law spectral index to use
-        aperture: (list float) source apperture radius (in arcsec) for each band.
-                    Default=[22., 30.,45.]
         src:      (Source class) Source object to use
                   OR
                   (SourceProfile class) SourceProfile object to use
+        aperture: (list float) source apperture radius (in arcsec) for each band.
+                    Default=[22., 30.,45.]
         annulus:  (list float) background annulus radius (in arcsec) for each band
                     Either 2-element list (uses same for each band), or list of 
                     three 2-element lists. Default=[60.,90.]
@@ -761,13 +967,14 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
               (one column per band, one row per alphaK value)
                     
     Calculation:
-        Calculates effective beam profile and area for given spectrum (can be slow)
+        Takes effective beam profile convo
         Integrates profile over aperture and annulus
         Calculates aperture correction factors, including and excluding background annulus
     
     Dependencies:
         spireBands() - list of spire bands
-        getCal() - retrieve photometer calibration product
+        SpireHandbookBundle_dev.getCal() - retrieve photometer calibration product
+        calceffBeamSrc() - calculate effective beam convolved with source
         herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
         herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
         herschel.ia.dataset.TableDataset()
@@ -822,7 +1029,7 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #calculate SourceProfile from src (if necessary)
-    if type(src)==Source:
+    if type(src)==srcMod.Source:
         srcProf=src.calcProfile(beamRad)
     else:
         if src.checkRadArr(beamRad):
@@ -833,15 +1040,17 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     #normalised to total area 1.
     srcProfNorm=srcProf.normArea()
     srcArea=srcProf.calcArea(forceNumerical=True)
-    srcAreaNorm=srcProfNorm.calcArea(forceNumerical=True)
-    print 'initial srcArea: %g'%srcArea
-    print 'normalised srcAreaNorm: %g'%srcAreaNorm
+    
     #create interpolator for computing aperture/annulus size
     sizeInterp = CubicSplineInterpolator(beamRad,2.*PI*beamRad)
+    
     if not aList:
         #alphaK is scalar
         apCorrNoBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         apCorrIncBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        
+        #calculate effective beam
+        effBeamsSrc=calcEffBeamSrc(alphaK,src,verbose=True)
         
         for band in spireBands():
             #create integrators
@@ -852,32 +1061,10 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
             sizeAp=integAp.integrate(sizeInterp)
             sizeBG=integBG.integrate(sizeInterp)
             
-            if verbose:print 'Constructing effective beam profile for %s and %f:'%(band,alphaK)
-            #calculate effective beam profile
-            effBeam_x=sh.spireEffBeam(sh.getSpireFreq(),sh.getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                sh.getSpireEffFreq()[band],gamma,band,BB=False,alpha=alphaK,verbose=verbose)
             
-            #turn into a SourceProfile object
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x['profile'])
-            effBeamArea=effBeamProfile.calcArea()
-            #effBeamAreaSr=effBeamArea*sh.arcsec2Sr()
-            print 'effBeam area: %g'%effBeamArea
-            print 'effBeam peak: %g'%effBeamProfile.profile[0]
-            effBeamNormProfile=effBeamProfile.normArea()
-            effBeamNormArea=effBeamNormProfile.calcArea()
-            print 'effBeam normalised area: %g'%effBeamNormArea
-            print 'effBeam normalised peak: %g'%effBeamNormProfile.profile[0]
-            srcConv=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
+            srcConv=effBeamsSrc[band]
             srcConvArea=srcConv.calcArea()
-            print 'convolved area: %g'%srcConvArea
-            print 'convolved peak: %g:'%srcConv.profile[0]
-
-            #divide by beam area
-            srcConvDiv = srcConv.mult(1./effBeamArea)
-            srcConvDivArea = srcConvDiv.calcArea()
-            print 'convolved div area: %g'%srcConvDivArea
-            print 'convolved div peak: %g:'%srcConvDiv.profile[0]
-
+            
             #interpolate convolved profile
             beamInterp = CubicSplineInterpolator(srcConv.radArr,srcConv.profile * 2.*PI*srcConv.radArr)
             
@@ -901,6 +1088,9 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
         apCorrIncBG={'PSW': Double1d(na,Double.NaN), 'PMW': Double1d(na,Double.NaN), 'PLW': Double1d(na,Double.NaN)}
         
         for a in range(na):
+            #calculate effective beam
+            effBeamsSrc=calcEffBeamSrc(alphaK[a],src,verbose=True)
+            
             for band in spireBands():
                 #create integrators
                 integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
@@ -909,31 +1099,8 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
                 sizeAp=integAp.integrate(sizeInterp)
                 sizeBG=integBG.integrate(sizeInterp)
                 
-                if verbose:print 'Constructing effective beam profile for %s and %f:'%(band,alphaK[a])
-                #calculate effective beam profile
-                effBeam_x=sh.spireEffBeam(sh.getSpireFreq(),sh.getSpireFilt(rsrfOnly=True)[band],beamProfs,\
-                    sh.getSpireEffFreq()[band],gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
-
-                #turn into a SourceProfile object
-                effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x['profile'])
-                effBeamArea=effBeamProfile.calcArea()
-                print 'effBeam area: %g'%effBeamArea
-                print 'effBeam peak: %g'%effBeamProfile.profile[0]
-                effBeamNormProfile=effBeamProfile.normArea()
-                effBeamNormArea=effBeamNormProfile.calcArea()
-                #effBeamAreaSr=effBeamArea*sh.arcsec2Sr()
-                print 'effBeam normalised area: %g'%effBeamNormArea
-                print 'effBeam normalised peak: %g'%effBeamNormProfile.profile[0]
-                srcConv=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
+                srcConv=effBeamsSrc[band]
                 srcConvArea=srcConv.calcArea()
-                print 'convolved area: %g'%srcConvArea
-                print 'convolved peak: %g:'%srcConv.profile[0]
-    
-                #divide by beam area
-                srcConvDiv = srcConv.mult(1./effBeamArea)
-                srcConvDivArea = srcConvDiv.calcArea()
-                print 'convolved div area: %g'%srcConvDivArea
-                print 'convolved div peak: %g:'%srcConvDiv.profile[0]
                 
                 #interpolate convolved profile
                 beamInterp = CubicSplineInterpolator(srcConv.radArr,srcConv.profile * 2.*PI*srcConv.radArr)
@@ -958,17 +1125,213 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
         #create and returnTableDataset
         apCorrNoBG_table=TableDataset()
         apCorrIncBG_table=TableDataset()
-        effArea_table=TableDataset()
         apCorrNoBG_table.setDescription("Aperture Correction without background annulus (Spectral Index)")
         apCorrIncBG_table.setDescription("Aperture Correction including background annulus (Spectral Index)")
-        effArea_table.setDescription("Effective area from Effective beam (Spectral Index)")
         apCorrNoBG_table.addColumn("alpha",Column(Double1d(alphaK)))
         apCorrIncBG_table.addColumn("alpha",Column(Double1d(alphaK)))
-        effArea_table.addColumn("alpha",Column(Double1d(alphaK)))
         for band in spireBands():
             apCorrNoBG_table.addColumn(band,Column(apCorrNoBG[band]))
             apCorrIncBG_table.addColumn(band,Column(apCorrIncBG[band]))
-            effArea_table.addColumn(band,Column(effArea[band]))
+        return (apCorrIncBG_table,apCorrNoBG_table)
+    
+def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,table=False):
+    """
+    ================================================================================
+    calcApCorr(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=False,table=False):
+        Calculates aperture corrections for semi-extended source with mod-BB spectrum
+        Returns corrections both with and without background annulus
+
+    Inputs:
+        betaK:    (float) Emmisivity spectral index to use
+        tempK:    (scalar/float array) Temperature(s) to use
+        src:      (Source class) Source object to use
+                  OR
+                  (SourceProfile class) SourceProfile object to use
+        aperture: (list float) source apperture radius (in arcsec) for each band.
+                    Default=[22., 30.,45.]
+        annulus:  (list float) background annulus radius (in arcsec) for each band
+                    Either 2-element list (uses same for each band), or list of 
+                    three 2-element lists. Default=[60.,90.]
+        verbose:  (boolean) Set to print more information. Default=True.
+        table:    (boolean) Set to output TableDataset. Default=False.
+    Outputs:
+        If table==False:
+            (dict) aperture correction INCLUDING background annulus (one scalar/list
+              per band, depending on whether alphaK is scalar/list)
+            (dict) aperture correction WITHOUT background annulus (one scalar/list
+              per band, depending on whether alpha is scalar/list)
+        If table==True:
+            (TableDataset) aperture correction INCLUDING background annulus
+              (one column per band, one row per alphaK value)
+            (TableDataset) aperture correction WITHOUT background annulus
+              (one column per band, one row per alphaK value)
+                    
+    Calculation:
+        Takes effective beam profile convo
+        Integrates profile over aperture and annulus
+        Calculates aperture correction factors, including and excluding background annulus
+    
+    Dependencies:
+        spireBands() - list of spire bands
+        SpireHandbookBundle_dev.getCal() - retrieve photometer calibration product
+        calceffBeamSrc() - calculate effective beam convolved with source
+        herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
+        herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
+        herschel.ia.dataset.TableDataset()
+    """
+    
+    #check type of src
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+      'src must be Source object or SourceProfile object'
+    #read aperture from input
+    assert type(aperture)==list,'aperture must be 3-element list'
+    assert len(aperture)==3,'aperture must be 3-element list'
+    apPhotRad={}
+    try:
+        apPhotRad["PSW"]=aperture[0]
+        apPhotRad["PMW"]=aperture[1]
+        apPhotRad["PLW"]=aperture[2]
+    except:
+        'Error reading from aperture: ',aperture
+    
+    #read annulus from input
+    assert type(annulus)==list,'Annulus must be 2 or 3-element list'
+    assert len(annulus)==3 or len(annulus)==2,'Annulus must be 2 or 3-element list'
+    apPhotBGRad={}
+    if len(annulus)==2:
+        #use same for each band
+        for band in spireBands():
+            apPhotBGRad[band]=annulus
+    else:
+        #use different for each band
+        for b in range(3):
+            band=spireBands()[b]
+            apPhotBGRad[band]=annulus[b]
+            assert type(apPhotBGRad[band])==list,'annulus[%d] is not 2-element list: '+str(annulus[b])
+            assert len(apPhotBGRad[band])==2,'annulus[%d] is not 2-element list: '+str(annulus[b])
+
+    #check they are valid
+    assert len(apPhotRad)==3,'Error reading from aperture: '+str(aperture)
+    assert len(apPhotBGRad)==3,'Error reading from annulus: '+str(annulus)
+    
+    try:
+        nt=len(tempK)
+        tList=True
+    except:
+        tList=False
+    
+    #get beam profile from cal product
+    beamProfs=sh.getCal().getProduct('RadialCorrBeam')
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+    gamma=beamProfs.meta['gamma'].double
+    maxRad=MAX(beamRad)
+    #setup integrator over whole beam
+    integTot=TrapezoidalIntegrator(0.,maxRad)
+
+    #calculate SourceProfile from src (if necessary)
+    if type(src)==srcMod.Source:
+        srcProf=src.calcProfile(beamRad)
+    else:
+        if src.checkRadArr(beamRad):
+            srcProf=src.regrid(beamRad)
+        else:
+            srcProf=src.copy()
+        
+    #normalised to total area 1.
+    srcProfNorm=srcProf.normArea()
+    srcArea=srcProf.calcArea(forceNumerical=True)
+    
+    #create interpolator for computing aperture/annulus size
+    sizeInterp = CubicSplineInterpolator(beamRad,2.*PI*beamRad)
+    
+    if not tList:
+        #alphaK is scalar
+        apCorrNoBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        apCorrIncBG={'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        
+        #calculate effective beam
+        effBeamsSrc=calcEffBeamSrc_BB(betaK,tempK,src,verbose=True)
+        
+        for band in spireBands():
+            #create integrators
+            integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
+            integBG=TrapezoidalIntegrator(apPhotBGRad[band][0],apPhotBGRad[band][1])
+            integTot=TrapezoidalIntegrator(0.,maxRad)
+            #integrate to find size of aperture/annulus
+            sizeAp=integAp.integrate(sizeInterp)
+            sizeBG=integBG.integrate(sizeInterp)
+            
+            
+            srcConv=effBeamsSrc[band]
+            srcConvArea=srcConv.calcArea()
+            
+            #interpolate convolved profile
+            beamInterp = CubicSplineInterpolator(srcConv.radArr,srcConv.profile * 2.*PI*srcConv.radArr)
+            
+            #if verbose:print '%s aperture/background sizes:'%band,sizeAp,sizeBG
+            #integrate profile to find beam area in aperture/annulus
+            omegaAp=integAp.integrate(beamInterp)
+            omegaBG=integBG.integrate(beamInterp)
+            omegaTot=integTot.integrate(beamInterp)	
+            #if verbose:print 'aperture/background beam areas:',omegaAp,omegaBG
+            #calculate apertur  ecorrections
+            apCorrNoBG[band] = \
+                srcConvArea/omegaAp
+            apCorrIncBG[band] =  \
+                srcConvArea/(omegaAp - omegaBG*sizeAp/sizeBG)
+        if (verbose):
+            print 'Calculated apCorr (noBG) for beta=%f, temp=%f: '%(betaK,tempK),apCorrNoBG["PSW"],apCorrNoBG["PMW"],apCorrNoBG["PLW"]
+            print 'Calculated apCorr (incBG) for beta=%f, temp=%f: '%(betaK,tempK),apCorrIncBG["PSW"],apCorrIncBG["PMW"],apCorrIncBG["PLW"]
+    else:
+        #alphaK is scalar
+        apCorrNoBG={'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
+        apCorrIncBG={'PSW': Double1d(nt,Double.NaN), 'PMW': Double1d(nt,Double.NaN), 'PLW': Double1d(nt,Double.NaN)}
+        
+        for t in range(nt):
+            #calculate effective beam
+            effBeamsSrc=calcEffBeamSrc_BB(betaK,tempK[t],src,verbose=True)
+            
+            for band in spireBands():
+                #create integrators
+                integAp=TrapezoidalIntegrator(0.,apPhotRad[band])
+                integBG=TrapezoidalIntegrator(apPhotBGRad[band][0],apPhotBGRad[band][1])
+                #integrate to find size of aperture/annulus
+                sizeAp=integAp.integrate(sizeInterp)
+                sizeBG=integBG.integrate(sizeInterp)
+                
+                srcConv=effBeamsSrc[band]
+                srcConvArea=srcConv.calcArea()
+                
+                #interpolate convolved profile
+                beamInterp = CubicSplineInterpolator(srcConv.radArr,srcConv.profile * 2.*PI*srcConv.radArr)
+            
+                #integrate profile to find beam area in aperture/annulus
+                omegaAp=integAp.integrate(beamInterp)
+                omegaBG=integBG.integrate(beamInterp)
+                omegaTot=integTot.integrate(beamInterp)
+                #calculate aperture corrections
+                apCorrNoBG[band][t] = \
+                    srcConvArea/omegaAp    
+                apCorrIncBG[band][t] =  \
+                    srcConvArea/(omegaAp - omegaBG*sizeAp/sizeBG)
+            if (verbose):
+                print 'Calculated apCorr (noBG) for beta=%f, temp=%f: '%(betaK,tempK[t]),apCorrNoBG["PSW"][t],apCorrNoBG["PMW"][t],apCorrNoBG["PLW"][t]
+                print 'Calculated apCorr (incBG) for beta=%f, temp=%f: '%(betaK,tempK[t]),apCorrIncBG["PSW"][t],apCorrIncBG["PMW"][t],apCorrIncBG["PLW"][t]
+        
+    if not table:
+        #return as is
+        return(apCorrIncBG,apCorrNoBG)
+    else:
+        #create and returnTableDataset
+        apCorrNoBG_table=TableDataset()
+        apCorrIncBG_table=TableDataset()
+        apCorrNoBG_table.setDescription("Aperture Correction without background annulus (modified black body, beta=%.2f)"%betaK)
+        apCorrIncBG_table.setDescription("Aperture Correction including background annulus (modified black body, beta=%.2f)"%betaK)
+        apCorrNoBG_table.addColumn("temperature",Column(Double1d(tempK)))
+        apCorrIncBG_table.addColumn("temperature",Column(Double1d(tempK)))
+        for band in spireBands():
+            apCorrNoBG_table.addColumn(band,Column(apCorrNoBG[band]))
+            apCorrIncBG_table.addColumn(band,Column(apCorrIncBG[band]))
         return (apCorrIncBG_table,apCorrNoBG_table)
     
 def semiExtendedTest():
@@ -1048,7 +1411,9 @@ def semiExtendedTest():
     return(srcWidths,KColPSrc,KColESrc)
 
 def testApCorr():
-    alphaK=2.0
+    alphaK=[2.0,3.0]
+    betaK=1.75
+    tempK=[20.,30.,40.]
     srcWidths=Float1d([0.2,0.5,1.,2.,5.,10.,20.,50.,100.,200.,500.,1000.,2000.,5000.,10000.])
     #srcWidths=Float1d([0.2,0.5,1.,10.,100.])
     #srcWidths=Float1d([10,20])
@@ -1062,6 +1427,7 @@ def testApCorr():
         src=srcMod.Source('Gaussian',[wid])
         
         apCorrBoth=calcApCorrSrc(alphaK,src,verbose=True,table=False)
+        apCorrBoth_BB=calcApCorrSrc_BB(betaK,tempK,src,verbose=True,table=False)
         apCorrIncBG_partialPSW.append(apCorrBoth[0]["PSW"])
         apCorrIncBG_partialPMW.append(apCorrBoth[0]["PMW"])
         apCorrIncBG_partialPLW.append(apCorrBoth[0]["PLW"])
