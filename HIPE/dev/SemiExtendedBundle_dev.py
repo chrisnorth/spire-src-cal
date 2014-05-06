@@ -183,7 +183,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
     
     if reCalc:
         beamSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
-        if srcProf.calcFwhm()<beamRad[10]:
+        if 0.5*srcProf.calcFwhm()<beamRad[10]:
             #quite a small source (< 10 steps in radius array)
             beamProfsFine=fineBeam(beamProfs,srcProf.calcFwhm())
             beamRadFine=beamProfsFine.getCoreCorrectionTable().getColumn('radius').data
@@ -254,57 +254,35 @@ def fineBeam(beamProfsIn,scaleWidth,verbose=False):
     #adjust sampling of fineBeam according to scaleWidth
     beamRadIn=beamProfsIn.getCoreCorrectionTable().getColumn('radius').data
 
-    iFine=11
-    if scaleWidth < beamRadIn[iFine]:
-#        print 'fine-sampling beam profiles'
-#        #source scale Width is smaller than 10 beamRad steps
-#        #add finely-sampled region of profile
-#        #get coarse part of array
-#        radArrCoarse=beamRadIn[iFine+1:]
-#        #generate fine part of array
-#        maxRadFine=beamRadIn[iFine]
-#        radFineStep=scaleWidth/2
-#        nRadFine=int(maxRadFine/radFineStep)
-#        #print iFine,maxRadFine,radFineStep,nRadFine
-#        radArrFine=Double1d().range(nRadFine)
-#        radArrFine=radArrFine*radFineStep
-#        
-#        #concatenate arrays
-#        beamRad=radArrFine
-#        beamRad.append(radArrCoarse)
+    #make whole array fine-sampled
+    maxRadFine=MAX(beamRadIn)
+    radFineStep=scaleWidth/10.
+    nRadFine=int(maxRadFine/radFineStep)
+    print 'fine sampling entire beam profile at %g arcsec for %g arcsec (%d steps)'%(radFineStep,maxRadFine,nRadFine)
+    beamRad=Double1d(range(nRadFine)) * radFineStep
 
-        #make whole array fine-sampled
-        maxRadFine=MAX(beamRadIn)
-        radFineStep=scaleWidth/2.
-        print 'fine sampling entire beam profile at %g arcsec'%radFineStep
-        nRadFine=int(maxRadFine/radFineStep)
-        beamRad=Double1d(range(nRadFine)) * radFineStep
-
-        #interpolate beamProfs
-        beamProfs=beamProfsIn.copy()
-        beamProfs.getCoreCorrectionTable().getColumn('radius').data=beamRad
-        beamProfs.getConstantCorrectionTable().getColumn('radius').data=beamRad
-        beamProfs.getNormAreaCorrectionTable().getColumn('radius').data=beamRad
-        for band in spireBands():
-            #get input arrays
-            beamCoreIn=beamProfsIn.getCoreCorrectionTable().getColumn(band).data
-            beamConstIn=beamProfsIn.getConstantCorrectionTable().getColumn(band).data
-            beamNormIn=beamProfsIn.getNormAreaCorrectionTable().getColumn(band).data
-            #make interpolation objects
-            beamCoreInterp=CubicSplineInterpolator(beamRadIn,beamCoreIn)
-            beamConstInterp=CubicSplineInterpolator(beamRadIn,beamConstIn)
-            beamNormInterp=CubicSplineInterpolator(beamRadIn,Double1d(beamNormIn))
-            #do interpolation
-            beamCoreNew=beamCoreInterp(beamRad)
-            beamConstNew=beamConstInterp(beamRad)
-            beamNormNew=beamNormInterp(beamRad)
-            #replace profile arrays
-            beamProfs.getCoreCorrectionTable().getColumn(band).data=beamCoreNew
-            beamProfs.getConstantCorrectionTable().getColumn(band).data=beamConstNew
-            beamProfs.getNormAreaCorrectionTable().getColumn(band).data=beamNormNew
-    else:
-        #get original RadialBeamCorr product
-        beamProfs=beamProfsIn.copy()
+    #interpolate beamProfs
+    beamProfs=beamProfsIn.copy()
+    beamProfs.getCoreCorrectionTable().getColumn('radius').data=beamRad
+    beamProfs.getConstantCorrectionTable().getColumn('radius').data=beamRad
+    beamProfs.getNormAreaCorrectionTable().getColumn('radius').data=beamRad
+    for band in spireBands():
+        #get input arrays
+        beamCoreIn=beamProfsIn.getCoreCorrectionTable().getColumn(band).data
+        beamConstIn=beamProfsIn.getConstantCorrectionTable().getColumn(band).data
+        beamNormIn=beamProfsIn.getNormAreaCorrectionTable().getColumn(band).data
+        #make interpolation objects
+        beamCoreInterp=CubicSplineInterpolator(beamRadIn,beamCoreIn)
+        beamConstInterp=CubicSplineInterpolator(beamRadIn,beamConstIn)
+        beamNormInterp=CubicSplineInterpolator(beamRadIn,Double1d(beamNormIn))
+        #do interpolation
+        beamCoreNew=beamCoreInterp(beamRad)
+        beamConstNew=beamConstInterp(beamRad)
+        beamNormNew=beamNormInterp(beamRad)
+        #replace profile arrays
+        beamProfs.getCoreCorrectionTable().getColumn(band).data=beamCoreNew
+        beamProfs.getConstantCorrectionTable().getColumn(band).data=beamConstNew
+        beamProfs.getNormAreaCorrectionTable().getColumn(band).data=beamNormNew
         
     return(beamProfs)
 
@@ -367,7 +345,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     
     
     if srcProf.key!=None:
-        effBeamKey='%s_alpha%g'%(srcProf.key,alphaK)
+        effBeamKey='%s_alpha_%g'%(srcProf.key,alphaK)
         try:
             srcConv=effBeamSrcProfs[effBeamKey]
             if verbose:print 'Using existing convolved beam profile %s'%effBeamKey
@@ -400,9 +378,9 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='%s_%s'%(effBeamKey,band))
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_alpha_%g_%s'%(alphaK,band))
             effBeamNormProfile=effBeamProfile.normArea()
-            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose)
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
             
@@ -501,10 +479,10 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key=effBeamKey)            
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_beta_%g_temp_%g_%s'%(betaK,tempK,band))            
             effBeamNormProfile=effBeamProfile.normArea()
                         
-            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
 
@@ -1353,8 +1331,10 @@ def clear(verbose=False):
             noDelList.append(var)
         exec('%s=None'%var)
     if verbose:
-        print 'Deleted Global Variables:',delList
-        print 'Unable to delete Global Variables:',noDelList
+        if len(delList)>0:
+            print 'Set Global Variables to None:',delList
+        if len(noDelList)>0:
+            print 'Unable to set Global Variables to None:',noDelList
         
 def semiExtendedTest():
     """
