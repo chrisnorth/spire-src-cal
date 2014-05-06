@@ -65,9 +65,17 @@
 #-------------------------------------------------------------------------------
 import os
 import herschel
-from herschel.ia.numeric import Double1d,Float1d,Int1d
-from herschel.spire.ia.cal import SpireCalTask
-spireCal = SpireCalTask()
+from herschel.share.util import Configuration
+from herschel.ia.numeric import Double1d,Float1d,Int1d,String1d
+from herschel.ia.dataset import TableDataset,Column
+from herschel.ia.toolbox.util import AsciiTableWriterTask, SimpleFitsWriterTask
+from herschel.ia.toolbox.util import AsciiTableReaderTask, SimpleFitsReaderTask
+asciiTableWriter=AsciiTableWriterTask()
+simpleFitsWriter=SimpleFitsWriterTask()
+asciiTableReader=AsciiTableReaderTask()
+simpleFitsReader=SimpleFitsReaderTask()
+#from herschel.spire.ia.cal import SpireCalTask
+#spireCal = SpireCalTask()
 from herschel.ia.numeric.toolbox.interp import LinearInterpolator,CubicSplineInterpolator
 from herschel.ia.numeric.toolbox.integr import TrapezoidalIntegrator
 from java.lang.Math import PI
@@ -1335,7 +1343,114 @@ def clear(verbose=False):
             print 'Set Global Variables to None:',delList
         if len(noDelList)>0:
             print 'Unable to set Global Variables to None:',noDelList
+            
+def saveMonoBeams(directory=None,verbose=False):
+    #save global variables to file
+    global beamMonoSrcArea
+    if directory==None:
+        directory=Configuration.getProperty('var.hcss.workdir')
+    fileMono='SemiExtendedBundle_SAVED_beamMonoSrcArea.csv'
+    if beamMonoSrcArea!=None:
+        keyList=[]
+        fileList=[]
+        for key in beamMonoSrcArea:
+            keyList.append(key)
+            fileKey='%s.fits'%key
+            fileList.append(fileKey)
+            beamTable=TableDataset()
+            beamTable.addColumn('freq',Column(Double1d(sh.getSpireFreq())/1.e9,description='Frequency (GHz)'))
+            for band in spireBands():
+                beamTable.addColumn(band,Column(Double1d(beamMonoSrcArea[key][band]),description='%s monochromatic area'))
+            simpleFitsWriter(product=beamTable,file=os.path.join(directory,fileKey))
+        fileTable=TableDataset()
+        fileTable.addColumn('key',Column(String1d(keyList)))
+        fileTable.addColumn('filename',Column(String1d(fileList)))
+        asciiTableWriter(table=fileTable,file=os.path.join(directory,fileMono))
+        if verbose:
+            print 'Saved beamMonoSrcArea to %s directory. Files listed in %s.'%(directory,fileMono)
+    
+def loadMonoBeams(directory=None,verbose=False):
+    #load beamMonoSrcArea global variables from file
+    global beamMonoSrcArea
+    try:
+        beamMonoSrcArea
+    except:
+        #make variable
+        beamMonoSrcArea={}
+    if directory==None:
+        directory=Configuration.getProperty('var.hcss.workdir')
+    fileMono='SemiExtendedBundle_SAVED_beamMonoSrcArea.csv'
+    fileTable=asciiTableReader(file=os.path.join(directory,fileMono))
+    keyList=fileTable['key'].data
+    fileList=fileTable['filename'].data
+    nKey=len(keyList)
+    for n in range(nKey):
+        key=keyList[n]
+        table=simpleFitsReader(file=os.path.join(directory,fileList[n]))
+        try:
+            beamMonoSrcArea[key]
+            if verbose:print 'Overwriting %s'%key
+            beamMonoSrcArea[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        except:
+            if verbose:print 'Reading %s'%key
+            beamMonoSrcArea[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        for band in spireBands():
+            beamMonoSrcArea[key][band]=table[band].data
+    if verbose:print 'BeamMonoSrcArea read from files in %s'%directory
         
+def saveEffBeams(directory=None,verbose=False):
+    global effBeamSrcProfs
+    if directory==None:
+        directory=Configuration.getProperty('var.hcss.workdir')
+    fileEff='SemiExtendedBundle_SAVED_effBeamSrcProfs.csv'
+    if effBeamSrcProfs!=None:
+        keyList=[]
+        fileList={'PSW':[],'PMW':[],'PLW':[]}
+        for key in effBeamSrcProfs:
+            keyList.append(key)
+            for band in spireBands():
+                fileKey='%s_%s.fits'%(key,band)
+                fileList[band].append(fileKey)
+                effBeamSrcProfs[key][band].saveFits(directory=directory,filename=fileKey,verbose=verbose)
+        fileTable=TableDataset()
+        fileTable.addColumn('key',Column(String1d(keyList)))
+        for band in spireBands():
+            fileTable.addColumn(band,Column(String1d(fileList[band]),description='%s files'%band))
+        asciiTableWriter(table=fileTable,file=os.path.join(directory,fileEff))
+        if verbose:
+            print 'Saved effBeamSrcProfs to %s directory. Files listed in %s.'%(directory,fileEff)
+        
+def loadEffBeams(directory=None,verbose=False):
+    #load beamMonoSrcArea global variables from file
+    global effBeamSrcProfs
+    try:
+        effBeamSrcProfs
+    except:
+        #make variable
+        effBeamSrcProfs={}
+    if directory==None:
+        directory=Configuration.getProperty('var.hcss.workdir')
+    fileEff='SemiExtendedBundle_SAVED_effBeamSrcProfs.csv'
+    fileTable=asciiTableReader(file=os.path.join(directory,fileEff))
+    keyList=fileTable['key'].data
+    fileList={}
+    for band in spireBands():
+        fileList[band]=fileTable[band].data
+    nKey=len(keyList)
+    for n in range(nKey):
+        key=keyList[n]
+        print key
+        try:
+            effBeamSrcProfs[key]
+            if verbose:print 'Overwriting %s'%key
+            effBeamsSrcProfs[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        except:
+            effBeamSrcProfs[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
+        for band in spireBands():
+            table=simpleFitsReader(file=os.path.join(directory,fileList[band][n]))
+            effBeamSrcProfs[key][band]=srcMod.SourceProfile().loadFits(directory=directory,filename=fileList[band][n],verbose=verbose)
+    if verbose:print 'effBeamSrcProfs read from files in %s'%directory
+    
 def semiExtendedTest():
     """
     ================================================================================
