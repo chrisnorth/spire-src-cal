@@ -185,7 +185,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
         beamSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
         if 0.5*srcProf.calcFwhm()<beamRad[10]:
             #quite a small source (< 10 steps in radius array)
-            beamProfsFine=fineBeam(beamProfs,srcProf.calcFwhm())
+            beamProfsFine=fineBeam(beamProfs,0.5*srcProf.calcFwhm())
             beamRadFine=beamProfsFine.getCoreCorrectionTable().getColumn('radius').data
             #define srcProfFine to be same length as beamRadFine
             srcProfFine=srcProf.regrid(beamRadFine)

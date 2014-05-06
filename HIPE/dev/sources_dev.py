@@ -552,7 +552,7 @@ class TopHatSourceType(SourceType):
         return(zeroVal)
         
     def calcFwhm(self,params):
-        srcFwhm=params[0]
+        srcFwhm=2.*params[0]
         return(srcFwhm)
         
     def calcScaleWidth(self,params):
