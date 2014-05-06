@@ -92,12 +92,15 @@ from herschel.ia.dataset.image import SimpleImage
 from herschel.ia.dataset.image.wcs import Wcs
 from herschel.ia.toolbox.image import TransposeTask,CropTask,CircleHistogramTask,ImageConvolutionTask
 from herschel.ia.toolbox.util import AsciiTableWriterTask, SimpleFitsWriterTask
+from herschel.ia.toolbox.util import AsciiTableReaderTask, SimpleFitsReaderTask
 crop=CropTask()
 transpose=TransposeTask()
 circleHistogram=CircleHistogramTask()
 imageConvolution=ImageConvolutionTask()
 asciiTableWriter=AsciiTableWriterTask()
 simpleFitsWriter=SimpleFitsWriterTask()
+asciiTableReader=AsciiTableReaderTask()
+simpleFitsReader=SimpleFitsReaderTask()
 from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs,Sqrt,Log
 FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
 EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
@@ -662,7 +665,7 @@ class SourceProfile(object):
         #set error
         if self.radArr==None:
             #no radArr
-            assert error==None,\
+            assert profile==None,\
               'cannot set profile without radArr'
             self.profile=None
         else:
@@ -705,7 +708,7 @@ class SourceProfile(object):
         return(self)
 
     def checkRadArr(self,radArr2):
-        #check whether radius array matches
+        #check whether radius array matches another
         if self.nRad==len(radArr2) and self.maxRad==MAX(radArr2):
             #arrays have same max and length
             #take difference of arrays
@@ -788,10 +791,40 @@ class SourceProfile(object):
         asciiTableWriter(table,os.path.join(directory,filename))
         if verbose:print 'Written to %s'%os.path.join(directory,filename)
 
+    def loadFits(self,directory=None,filename=None,verbose=False):
+        #read from a FITS file
+        if directory==None:
+            directory=Configuration.getProperty('var.hcss.workdir')
+        assert filename!=None,'Must provide filename'
+        table=simpleFitsReader(os.path.join(directory,filename))
+        self.setRadArr(table['radius'].data)
+        self.setProfile(table['profile'].data)
+        self.setError(table['error'].data)
+        self.setKey(table.meta['key'].string)
+        self.clearOrig()
+        if verbose:
+            print 'Reading profile from %s'%(os.path.join(directory,filename))
+        return self
+        
+    def loadAscii(self,directory=None,filename=None,verbose=False):
+        #read from a FITS file
+        if directory==None:
+            directory=Configuration.getProperty('var.hcss.workdir')
+        assert filename!=None,'Must provide filename'
+        table=asciiTableReader(os.path.join(directory,filename))
+        self.setRadArr(table['radius'].data)
+        self.setProfile(table['profile'].data)
+        self.setError(table['error'].data)
+        set.setKey(table.meta['key'].string)
+        if verbose:
+            print 'Reading profile from %s'%(os.path.join(directory,filename))
+        return self
+        self.clearOrig()
+
     def generate(self,src,radArr,key=None):
         #generate profile from Source object
         self.setRadArr(radArr)
-        self.profile=src.calcProfile(radArr)
+        self.setProfile(src.calcProfile(radArr))
         #make blank error array
         self.setError(None)
         self.setOrig(src)
@@ -849,7 +882,7 @@ class SourceProfile(object):
         if self.key==None:
             newProf.setKey(key)
         else:
-            newProf.setKey(key,'%s_normProf%g'%(self.key,prof0))
+            newProf.setKey(key,'%s_normProf'%(self.key))
         return(newProf)
         
     def normArea(self,key=None):
@@ -864,7 +897,7 @@ class SourceProfile(object):
         if self.key==None:
             newProf.setKey(key)
         else:
-            newProf.setKey(key,'%s_normArea%g'%(self.key,area0))
+            newProf.setKey(key,'%s_normArea'%(self.key))
         return(newProf)
 
     def calcArea(self,forceNumerical=False,forceAnalytical=False):
