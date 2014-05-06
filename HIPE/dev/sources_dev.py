@@ -82,15 +82,22 @@
 #===============================================================================
 #-------------------------------------------------------------------------------
 
+import os
 import herschel
+from herschel.share.util import Configuration
 from herschel.ia.numeric import Double1d,Float1d,Int1d,Double2d
+from herschel.ia.dataset import TableDataset,Column
+from herschel.ia.dataset import DoubleParameter,LongParameter,StringParameter,BooleanParameter
 from herschel.ia.dataset.image import SimpleImage
 from herschel.ia.dataset.image.wcs import Wcs
 from herschel.ia.toolbox.image import TransposeTask,CropTask,CircleHistogramTask,ImageConvolutionTask
+from herschel.ia.toolbox.util import AsciiTableWriterTask, SimpleFitsWriterTask
 crop=CropTask()
 transpose=TransposeTask()
 circleHistogram=CircleHistogramTask()
 imageConvolution=ImageConvolutionTask()
+asciiTableWriter=AsciiTableWriterTask()
+simpleFitsWriter=SimpleFitsWriterTask()
 from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs,Sqrt,Log
 FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
 EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
@@ -405,7 +412,7 @@ class ExponentialSourceType(SourceType):
         srcWidth=params[0]
         srcPeak=params[1]
         if srcWidth > 0:
-            srcArea=srcPeak * srcWidth
+            srcArea=srcPeak * 2.*PI*1.*srcWidth**2
         else:
             print 'Warning: no analytical value for area of EXPONENT source with negative scale width'
             srcArea=Double.NaN
@@ -487,7 +494,7 @@ class PowerLawSourceType(SourceType):
     def calcScaleWidth(self,params):
         #return scale radius
         scaleWidth=params[1]
-        return(scaleWidth)
+        return(scaleWidth)	
         
 class ConstantSourceType(SourceType):
     def __init__(self):
@@ -600,7 +607,7 @@ class LinConstSourceType(SourceType):
         srcMin=params[2]
         srcMax=params[3]
         if srcGrad<0:
-            srcFwhm=(srcZero-srcMin)/srcGrad
+            srcFwhm=-(srcZero-srcMin)/srcGrad
         else:
             #no analytical solution
             print 'Warning: no analytical value for FWHM of LINCONST source with gradient >= 0'
@@ -611,11 +618,12 @@ class LinConstSourceType(SourceType):
         zeroVal=params[1]
         if zeroVal < params[2]: zeroVal=params[2]
         if zeroVal > params[3]: zeroVal=params[3]
+        return(zeroVal)
         
     def calcScaleWidth(self,params):
         #calculate half-width-half-max
         if params[0] < 0:
-            scaleWidth=(params[1]-params[2])/params[0]
+            scaleWidth=-(params[1]-params[2])/params[0]
         else:
             scaleWidth=(params[3]-params[1])/params[0]
         return(scaleWidth)
@@ -728,7 +736,58 @@ class SourceProfile(object):
 
     def copy(self):
         return(SourceProfile(radArr=self.radArr,profile=self.profile,error=self.error,originator=self.origSrc,key=self.key))
+
+    def makeTable(self):
+        table=TableDataset()
+        table.setDescription('Radial Profile Table')
+        table.addColumn('radius',Column(self.radArr,description='radius array'))
+        table.addColumn('profile',Column(self.profile,description='radial profile'))
+        table.addColumn('error',Column(self.error,description='error on radial profile'))
+        table.meta['nRad']=LongParameter(self.nRad,description='length of radius array')
+        table.meta['maxRad']=DoubleParameter(self.maxRad,description='maximum radius')
+        table.meta['key']=StringParameter(self.key,description='unique key')
+        table.meta['fwhm']=DoubleParameter(self.calcFwhm(),description='source FWHM')
+        table.meta['area']=DoubleParameter(self.calcArea(),description='source area')
+        table.meta['fromSrc']=BooleanParameter(self.fromSrc,description='is profile based on Source')
+        if self.fromSrc:
+            table.meta['origSrc']=StringParameter(self.origSrc.key,description='original Source key')
+            table.meta['srcType']=StringParameter(self.origSrc.type,description='source type')
+            for n in range(self.origSrc.nParams):
+                table.meta['srcPar_%d'%n]=DoubleParameter(Double(self.origSrc.params[n]),\
+                  description=self.origSrc.paramNames[n])
+        self.table=table
+        return(table)
         
+    def saveFits(self,directory=None,filename=None,verbose=False):
+        #save table in FITS file
+        
+        #make table object
+        table=self.makeTable()
+        #set directory and filename
+        if directory==None:
+            directory=Configuration.getProperty('var.hcss.workdir')
+        if self.key==None:
+            assert filename!=None,'No key in SourceProfile. Filename must be provided'
+        if filename==None:
+            filename='%s.fits'%self.key
+        simpleFitsWriter(table,os.path.join(directory,filename))
+        if verbose:print 'Written to %s'%os.path.join(directory,filename)
+        
+    def saveAscii(self,directory=None,filename=None,verbose=False):
+        #save table in ASCII CSV file
+        
+        #make table object
+        table=self.makeTable()
+        #set directory and filename
+        if directory==None:
+            directory=Configuration.getProperty('var.hcss.workdir')
+        if self.key==None:
+            assert filename!=None,'No key in SourceProfile. Filename must be provided'
+        if filename==None:
+            filename='%s.csv'%self.key
+        asciiTableWriter(table,os.path.join(directory,filename))
+        if verbose:print 'Written to %s'%os.path.join(directory,filename)
+
     def generate(self,src,radArr,key=None):
         #generate profile from Source object
         self.setRadArr(radArr)
@@ -819,7 +878,7 @@ class SourceProfile(object):
             if self.fromSrc:
                 srcArea=self.origSrc.calcArea()
             else:
-                srcArea=Double.NaN()
+                srcArea=Double.NaN
         else:
             #calculate from source if possible, else use numerical integration
             if self.fromSrc:
@@ -851,7 +910,7 @@ class SourceProfile(object):
             if self.fromSrc:
                 srcFwhm=self.origSrc.calcFwhm()
             else:
-                srcFwhm=Double.NaN()
+                srcFwhm=Double.NaN
         else:
             if self.fromSrc:
                 #try to get analytical area from origSrc
@@ -865,7 +924,6 @@ class SourceProfile(object):
 
         if doNum:
             #calculate area numerically
-            #print 'numerical integration'
             try:
                 #try interpolation (only works if profile is monatonic
                 profInterp=CubicSplineInterpolator(self.profile,self.radArr)
@@ -878,15 +936,18 @@ class SourceProfile(object):
                 r=0
                 profThis=self.profile[0]
                 radThis=self.radArr[0]
-                while not halfFound:
+                while not halfFound and r<self.nRad-1:
                     r=r+1
-                    profPrev=profThis.copy()
-                    radPrev=radPrev.copy()
-                    radThis=this.radArr[r]
-                    profThis=this.profile[2]
+                    profPrev=profThis
+                    radPrev=radThis
+                    radThis=self.radArr[r]
+                    profThis=self.profile[2]
                     if profThis<=profHalf:
                         halfFound=True
-                srcFwhm = 2. * (radPrev + (profHalf-profPrev)*(radThis-radPrev)/(profThis-profPrev))
+                if not halfFound:
+                    srcFwhm=Double.NaN
+                else:
+                    srcFwhm = 2. * (radPrev + (profHalf-profPrev)*(radThis-radPrev)/(profThis-profPrev))
 
         return(srcFwhm)
         
@@ -998,8 +1059,8 @@ class SourceProfile(object):
         quadErr=Double2d(nXQuad,nYQuad)
         #print quadArr.dimensions
         #create profile interpolation
-        profInterp=CubicSplineInterpolator(self.radArr,self.profile)
-        errInterp=CubicSplineInterpolator(self.radArr,self.error)
+        profInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.profile))
+        errInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.error))
         #fill first quadrant
         yList=range(nYQuad)
         #print MIN(yList),MAX(yList)
@@ -1060,16 +1121,17 @@ class SourceProfile(object):
             if self.nRad<=5:
                 result=result+'\nradArr: '+self.radArr
                 result=result+'\nprofile: '+self.profile
+                result=result+'\nerror: '+self.error
             else:
                 result=result+'\nradArr: [%g, %g, ... %g, %g]'%(self.radArr[0],self.radArr[1],self.radArr[-2],self.radArr[-1])
                 result=result+'\nprofile: [%g, %g, ... %g, %g]'%(self.profile[0],self.profile[1],self.profile[-2],self.profile[-1])
+                result=result+'\error: [%g, %g, ... %g, %g]'%(self.error[0],self.error[1],self.error[-2],self.error[-1])
             result=result+'\nfromSrc: %r'%self.fromSrc
             if self.fromSrc:
                 result=result+'\norigSrc: %s'%self.origSrc.key
         return(result)
 
-
-def convolveProfiles(profile1,profile2,key=None):
+def convolveProfiles(profile1,profile2,key=None,verbose=False):
     assert type(profile1)==SourceProfile,'profile1 must be SourceProfile object'
     assert type(profile2)==SourceProfile,'profile2 must be SourceProfile object'
     
@@ -1090,7 +1152,7 @@ def convolveProfiles(profile1,profile2,key=None):
         profile2Regrid=profile2.copy()
     else:
         #same resolution
-        print 'no regridding necessary'
+        if(verbose):print 'no regridding necessary'
         profile1Regrid=profile1.copy()
         profile2Regrid=profile2.copy()
 

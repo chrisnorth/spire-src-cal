@@ -2569,8 +2569,22 @@ def calcApCorr_BB(betaK,tempK,aperture=[22., 30.,45.],annulus=[60.,90],verbose=F
             apCorrIncBG_BB_table.addColumn(band,Column(apCorrIncBG_BB[band]))
         return (apCorrIncBG_BB_table,apCorrNoBG_BB_table)
 
-#def clear():
-#    del(spireCalPhot,spireFreq,spireEffFreq,spireRefFreq,spireFilt,spireFiltOnly,monoBeamAreas,spireEffBeams)
+def clear(verbose=False):
+    #sets global variables to NoneType
+    varList=['spireCalPhot','spireFreq','spireRefFreq','spireEffFreq',\
+      'spireFilt','spireFiltOnly','monoBeamArea','spireEffBeams']
+    delList=[]
+    noDelList=[]
+    for var in varList:
+        exec('global %s'%var)
+        try:
+            exec('%s=None'%var)
+            delList.append(var)
+        except:
+            noDelList.append(var)
+    if verbose:
+        print 'Deleted Global Variables:',delList
+        print 'Unable to delete Global Variables:',noDelList
 
 def spireColCorrTest(beamType='Full'):
     """
@@ -2669,106 +2683,106 @@ def spireColCorrTest(beamType='Full'):
     
     return(beamMonoArea,alphaArr,omegaEff,KBeam,KColP,KColE,apCorrIncBG,apCorrNoBG)
 
-def compFullSimple():
-    """
-    ================================================================================
-    compFullSimple():
-        Test script to compare effect of full/simple beam treatments
-    Inputs:
-        NONE
-    Outputs:
-        8 x Plots
-                    
-    Calculation:
-        Calculates correction parameters for full beam treatment
-        Calculates correction parameters for simple beam treatment
-        Plots values and full/simple comparisons
-    
-    Dependencies:
-        spireColCorrTest() - test colour correction parameters
-    """
-    #compare full vs single beam treatments:
-    beamMonoArea_F,alphaArr,omegaEff_F,KBeam_F,KColP_F,KColE_F=spireColCorrTest(beamType='Full')
-    beamMonoArea_S,alphaArr,omegaEff_S,KBeam_S,KColP_S,KColE_S=spireColCorrTest(beamType='Simple')
-    pB=PlotXY()
-    pOE=PlotXY()
-    pKB=PlotXY()
-    pKCE=PlotXY()
+#def compFullSimple():
+#    """
+#    ================================================================================
+#    compFullSimple():
+#        Test script to compare effect of full/simple beam treatments
+#    Inputs:
+#        NONE
+#    Outputs:
+#        8 x Plots
+#                    
+#    Calculation:
+#        Calculates correction parameters for full beam treatment
+#        Calculates correction parameters for simple beam treatment
+#        Plots values and full/simple comparisons
+#    
+#    Dependencies:
+#        spireColCorrTest() - test colour correction parameters
+#    """
+#    #compare full vs single beam treatments:
+#    beamMonoArea_F,alphaArr,omegaEff_F,KBeam_F,KColP_F,KColE_F=spireColCorrTest(beamType='Full')
+#    beamMonoArea_S,alphaArr,omegaEff_S,KBeam_S,KColP_S,KColE_S=spireColCorrTest(beamType='Simple')
+#    pB=PlotXY()
+#    pOE=PlotXY()
+#    pKB=PlotXY()
+#    pKCE=PlotXY()
+#
+#    pBd=PlotXY()
+#    pOEd=PlotXY()
+#    pKBd=PlotXY()
+#    pKCEd=PlotXY()
+#
+#    cols={'PSW':java.awt.Color.BLUE,\
+#      'PMW':java.awt.Color.GREEN,\
+#      'PLW':java.awt.Color.RED}
+#    for band in spireBands():
+#        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_F[band],name='Beam Area %s (full)'%band,\
+#          color=cols[band]))
+#        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band],name='Beam Area %s (simple)'%band,\
+#          color=cols[band],line=Style.DASHED))
+#        pBd.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band]/beamMonoArea_F[band]-1.,name='Beam Area %s (s-f)'%band,\
+#          color=cols[band]))
+#        
+#        pOE.addLayer(LayerXY(alphaArr,omegaEff_F[band],name='OmegaEff %s (full)'%band,\
+#          color=cols[band]))
+#        pOE.addLayer(LayerXY(alphaArr,omegaEff_S[band],name='OmegaEff %s (simple)'%band,\
+#          color=cols[band],line=Style.DASHED))
+#        pOEd.addLayer(LayerXY(alphaArr,omegaEff_S[band]/omegaEff_F[band]-1.,name='OmegaEff %s (s-f)'%band,\
+#          color=cols[band]))
+#    
+#        pKB.addLayer(LayerXY(alphaArr,KBeam_F[band],name='KBeam %s (full)'%band,\
+#          color=cols[band]))
+#        pKB.addLayer(LayerXY(alphaArr,KBeam_S[band],name='KBeam %s (simple)'%band,\
+#          color=cols[band],line=Style.DASHED))
+#        pKBd.addLayer(LayerXY(alphaArr,KBeam_S[band]/KBeam_F[band]-1.,name='KBeam %s (s-f)'%band,\
+#          color=cols[band]))
+#    
+#        pKCE.addLayer(LayerXY(alphaArr,KColE_F[band],name='KColE %s (full)'%band,\
+#          color=cols[band]))
+#        pKCE.addLayer(LayerXY(alphaArr,KColE_S[band],name='KColE %s (simple)'%band,\
+#          color=cols[band],line=Style.DASHED))
+#        pKCEd.addLayer(LayerXY(alphaArr,KColE_S[band]/KColE_F[band]-1.,name='KColE %s (s-g)'%band,\
+#          color=cols[band]))
+#
+#    pB.xaxis.titleText = 'Frequency (GHz)'
+#    pB.yaxis.titleText = 'Beam Area (sr)'
+#    pBd.xaxis.titleText = 'Frequency (GHz)'
+#    pBd.yaxis.titleText = 'Beam Area rel. diff'
+#    
+#    pOE.xaxis.titleText = 'Spectra Index (alpha)'
+#    pOE.yaxis.titleText = 'Effective Beam Area (sr)'
+#    pOEd.xaxis.titleText = 'Spectra Index (alpha)'
+#    pOEd.yaxis.titleText = 'Effective Beam Area rel. diff'
+#    
+#    pKB.xaxis.titleText = 'Spectra Index (alpha)'
+#    pKB.yaxis.titleText = 'KBeam'
+#    pKBd.xaxis.titleText = 'Spectra Index (alpha)'
+#    pKBd.yaxis.titleText = 'KBeam rel. diff'
+#
+#    pKCE.xaxis.titleText = 'Spectra Index (alpha)'
+#    pKCE.yaxis.titleText = 'KColE'
+#    pKCEd.xaxis.titleText = 'Spectra Index (alpha)'
+#    pKCEd.yaxis.titleText = 'KColE rel. diff'
 
-    pBd=PlotXY()
-    pOEd=PlotXY()
-    pKBd=PlotXY()
-    pKCEd=PlotXY()
-
-    cols={'PSW':java.awt.Color.BLUE,\
-      'PMW':java.awt.Color.GREEN,\
-      'PLW':java.awt.Color.RED}
-    for band in spireBands():
-        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_F[band],name='Beam Area %s (full)'%band,\
-          color=cols[band]))
-        pB.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band],name='Beam Area %s (simple)'%band,\
-          color=cols[band],line=Style.DASHED))
-        pBd.addLayer(LayerXY(spireFreq/1.e9,beamMonoArea_S[band]/beamMonoArea_F[band]-1.,name='Beam Area %s (s-f)'%band,\
-          color=cols[band]))
-        
-        pOE.addLayer(LayerXY(alphaArr,omegaEff_F[band],name='OmegaEff %s (full)'%band,\
-          color=cols[band]))
-        pOE.addLayer(LayerXY(alphaArr,omegaEff_S[band],name='OmegaEff %s (simple)'%band,\
-          color=cols[band],line=Style.DASHED))
-        pOEd.addLayer(LayerXY(alphaArr,omegaEff_S[band]/omegaEff_F[band]-1.,name='OmegaEff %s (s-f)'%band,\
-          color=cols[band]))
-    
-        pKB.addLayer(LayerXY(alphaArr,KBeam_F[band],name='KBeam %s (full)'%band,\
-          color=cols[band]))
-        pKB.addLayer(LayerXY(alphaArr,KBeam_S[band],name='KBeam %s (simple)'%band,\
-          color=cols[band],line=Style.DASHED))
-        pKBd.addLayer(LayerXY(alphaArr,KBeam_S[band]/KBeam_F[band]-1.,name='KBeam %s (s-f)'%band,\
-          color=cols[band]))
-    
-        pKCE.addLayer(LayerXY(alphaArr,KColE_F[band],name='KColE %s (full)'%band,\
-          color=cols[band]))
-        pKCE.addLayer(LayerXY(alphaArr,KColE_S[band],name='KColE %s (simple)'%band,\
-          color=cols[band],line=Style.DASHED))
-        pKCEd.addLayer(LayerXY(alphaArr,KColE_S[band]/KColE_F[band]-1.,name='KColE %s (s-g)'%band,\
-          color=cols[band]))
-
-    pB.xaxis.titleText = 'Frequency (GHz)'
-    pB.yaxis.titleText = 'Beam Area (sr)'
-    pBd.xaxis.titleText = 'Frequency (GHz)'
-    pBd.yaxis.titleText = 'Beam Area rel. diff'
-    
-    pOE.xaxis.titleText = 'Spectra Index (alpha)'
-    pOE.yaxis.titleText = 'Effective Beam Area (sr)'
-    pOEd.xaxis.titleText = 'Spectra Index (alpha)'
-    pOEd.yaxis.titleText = 'Effective Beam Area rel. diff'
-    
-    pKB.xaxis.titleText = 'Spectra Index (alpha)'
-    pKB.yaxis.titleText = 'KBeam'
-    pKBd.xaxis.titleText = 'Spectra Index (alpha)'
-    pKBd.yaxis.titleText = 'KBeam rel. diff'
-
-    pKCE.xaxis.titleText = 'Spectra Index (alpha)'
-    pKCE.yaxis.titleText = 'KColE'
-    pKCEd.xaxis.titleText = 'Spectra Index (alpha)'
-    pKCEd.yaxis.titleText = 'KColE rel. diff'
-
-def testApCorr():
-    #test aperture corrections
-    apCorrIncBGCal=getCal().getProduct('ColorCorrApertureList')[0]['alpha']
-    apCorrNoBGCal=getCal().getProduct('ColorCorrApertureList')[1]['alpha']
-    na=len(apCorrIncBGCal['alpha'].data)
-    alphaK=apCorrIncBGCal['alpha'].data[0:na]
-    result=calcApCorr(alphaK,verbose=True,table=True)
-    apCorrIncBG=result[0]
-    apCorrNoBG=result[1]
-    effArea=result[2]
-    omegaEff=calcOmegaEff(alphaK,verbose=True,table=True)
-    apCorrIncBG_diff=apCorrIncBG.copy()
-    apCorrNoBG_diff=apCorrNoBG.copy()
-    effArea_diff=effArea.copy()
-    for band in spireBands():
-        apCorrIncBG_diff[band].data = apCorrIncBG[band].data/apCorrIncBGCal[band].data[0:na]
-        apCorrNoBG_diff[band].data = apCorrNoBG[band].data/apCorrNoBGCal[band].data[0:na]
-        effArea_diff[band].data = effArea[band].data/omegaEff[band].data
-        
-    return(alphaK,[apCorrIncBGCal,apCorrNoBGCal,omegaEff],[apCorrIncBG,apCorrNoBG,effArea],[apCorrIncBG_diff,apCorrNoBG_diff,effArea_diff])
+#def testApCorr():
+#    #test aperture corrections
+#    apCorrIncBGCal=getCal().getProduct('ColorCorrApertureList')[0]['alpha']
+#    apCorrNoBGCal=getCal().getProduct('ColorCorrApertureList')[1]['alpha']
+#    na=len(apCorrIncBGCal['alpha'].data)
+#    alphaK=apCorrIncBGCal['alpha'].data[0:na]
+#    result=calcApCorr(alphaK,verbose=True,table=True)
+#    apCorrIncBG=result[0]
+#    apCorrNoBG=result[1]
+#    effArea=result[2]
+#    omegaEff=calcOmegaEff(alphaK,verbose=True,table=True)
+#    apCorrIncBG_diff=apCorrIncBG.copy()
+#    apCorrNoBG_diff=apCorrNoBG.copy()
+#    effArea_diff=effArea.copy()
+#    for band in spireBands():
+#        apCorrIncBG_diff[band].data = apCorrIncBG[band].data/apCorrIncBGCal[band].data[0:na]
+#        apCorrNoBG_diff[band].data = apCorrNoBG[band].data/apCorrNoBGCal[band].data[0:na]
+#        effArea_diff[band].data = effArea[band].data/omegaEff[band].data
+#        
+#    return(alphaK,[apCorrIncBGCal,apCorrNoBGCal,omegaEff],[apCorrIncBG,apCorrNoBG,effArea],[apCorrIncBG_diff,apCorrNoBG_diff,effArea_diff])

@@ -190,7 +190,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
             #define srcProfFine to be same length as beamRadFine
             srcProfFine=srcProf.regrid(beamRadFine)
             srcAreaFine=srcProfFine.calcArea()*sh.arcsec2Sr()
-            if srcProf.calcFwhm()<beamRad[2] and fromSrc==True:
+            if srcProf.calcFwhm()<beamRad[1] and fromSrc==True:
                 #VERY small (scale width < 1 step in radius array)
                 if (verbose):print 'Very small source [FWHM=%g arcsec]. Using source area only (ignoring beam)'%srcProf.calcFwhm()
                 for band in spireBands():
@@ -256,21 +256,29 @@ def fineBeam(beamProfsIn,scaleWidth,verbose=False):
 
     iFine=11
     if scaleWidth < beamRadIn[iFine]:
-        print 'fine-sampling beam profiles'
-        #source scale Width is smaller than 10 beamRad steps
-        #add finely-sampled region of profile
-        #get coarse part of array
-        radArrCoarse=beamRadIn[iFine+1:]
-        #generate fine part of array
-        maxRadFine=beamRadIn[iFine]
-        radFineStep=scaleWidth/2
+#        print 'fine-sampling beam profiles'
+#        #source scale Width is smaller than 10 beamRad steps
+#        #add finely-sampled region of profile
+#        #get coarse part of array
+#        radArrCoarse=beamRadIn[iFine+1:]
+#        #generate fine part of array
+#        maxRadFine=beamRadIn[iFine]
+#        radFineStep=scaleWidth/2
+#        nRadFine=int(maxRadFine/radFineStep)
+#        #print iFine,maxRadFine,radFineStep,nRadFine
+#        radArrFine=Double1d().range(nRadFine)
+#        radArrFine=radArrFine*radFineStep
+#        
+#        #concatenate arrays
+#        beamRad=radArrFine
+#        beamRad.append(radArrCoarse)
+
+        #make whole array fine-sampled
+        maxRadFine=MAX(beamRadIn)
+        radFineStep=scaleWidth/2.
+        print 'fine sampling entire beam profile at %g arcsec'%radFineStep
         nRadFine=int(maxRadFine/radFineStep)
-        radArrFine=Double1d().range(nRadFine)
-        radArrFine=radArrFine*radFineStep
-        
-        #concatenate arrays
-        beamRad=radArrFine
-        beamRad.append(radArrCoarse)
+        beamRad=Double1d(range(nRadFine)) * radFineStep
 
         #interpolate beamProfs
         beamProfs=beamProfsIn.copy()
@@ -355,7 +363,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     elif type(src)==srcMod.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
-        if verbose:print'Using SourceProfile %s'%(srcProf.keyS)
+        if verbose:print'Using SourceProfile %s'%(srcProf.key)
     
     
     if srcProf.key!=None:
@@ -366,7 +374,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
             reCalc=forceRecalc
             #global variable already defined, so do nothing.
         except:
-            print 'Calculating convolved beams for %s'%effBeamKey
+            if verbose:print 'Calculating convolved beams for %s'%effBeamKey
             try:
                 effBeamSrcProfs
                 #exists, don't create
@@ -392,14 +400,12 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key=effBeamKey)            
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='%s_%s'%(effBeamKey,band))
             effBeamNormProfile=effBeamProfile.normArea()
-                        
-            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
-        print str(srcConv)
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose)
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
-
+            
     return(srcConv)
 
 def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
@@ -458,7 +464,7 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
     elif type(src)==srcMod.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
-        if verbose:print'Using SourceProfile %s'%(srcProf.keyS)
+        if verbose:print'Using SourceProfile %s'%(srcProf.key)
     
     
     if srcProf.key!=None:
@@ -469,7 +475,7 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
             reCalc=forceRecalc
             #global variable already defined, so do nothing.
         except:
-            print 'Calculating convolved beams for %s'%effBeamKey
+            if verbose:print 'Calculating convolved beams for %s'%effBeamKey
             try:
                 effBeamSrcProfs
                 #exists, don't create
@@ -499,7 +505,6 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
             effBeamNormProfile=effBeamProfile.normArea()
                         
             srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile)
-        print str(srcConv)
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
 
@@ -580,7 +585,7 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
             #make profile and integrate
             beamRad=sh.getCal().getProduct("RadialCorrBeam").getCoreCorrectionTable().getColumn('radius').data
             srcArea=src.calcProfile(beamRad).calcArea()
-
+    print srcArea
     assert (not Double.isNaN(srcArea)),'Problem calculating source are for %s (%s)'%(src.key,type(src))
     if not aList:
         # alphaK is scalar
@@ -892,7 +897,7 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
     #check type of src
     assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
-      
+            
     k4E_Tot=sh.calcKMonE()
     print 'k4E_Tot:',k4E_Tot
     try:
@@ -1334,6 +1339,23 @@ def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],ve
             apCorrIncBG_table.addColumn(band,Column(apCorrIncBG[band]))
         return (apCorrIncBG_table,apCorrNoBG_table)
     
+def clear(verbose=False):
+    #sets global variables to NoneType
+    varList=['beamMonoSrcArea','effBeamSrcProfs']
+    delList=[]
+    noDelList=[]
+    for var in varList:
+        exec('global %s'%var)
+        try:
+            exec('%s=None'%var)
+            delList.append(var)
+        except:
+            noDelList.append(var)
+        exec('%s=None'%var)
+    if verbose:
+        print 'Deleted Global Variables:',delList
+        print 'Unable to delete Global Variables:',noDelList
+        
 def semiExtendedTest():
     """
     ================================================================================
@@ -1394,7 +1416,7 @@ def semiExtendedTest():
         KColE_partial=calcKColESrc(alphaK,src,verbose=True,table=False)
 
         #calculate colour corrections from source profile
-        srcProf=src.calcProfile(Float1d(range(700)))
+        srcProf=src.calcProfile(Double1d(range(700)))
         KColP_partial=calcKColPSrc(alphaK,srcProf,verbose=True,table=False)
         KColE_partial=calcKColESrc(alphaK,srcProf,verbose=True,table=False)
 
