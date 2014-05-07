@@ -962,19 +962,21 @@ class SourceProfile(object):
                 profInterp=CubicSplineInterpolator(self.profile,self.radArr)
                 profHalf=self.profile[0]/2.
                 srcFwhm=2.*profInterp(profHalf)
+                print 'interpolated:',profHalf
+                broken
             except:
                 #step through manually
                 halfFound=False
                 profHalf=self.profile[0]/2.
                 r=0
-                profThis=self.profile[0]
-                radThis=self.radArr[0]
+                profThis=self.profile[r]
+                radThis=self.radArr[r]
                 while not halfFound and r<self.nRad-1:
                     r=r+1
                     profPrev=profThis
                     radPrev=radThis
                     radThis=self.radArr[r]
-                    profThis=self.profile[2]
+                    profThis=self.profile[r]
                     if profThis<=profHalf:
                         halfFound=True
                 if not halfFound:
@@ -1083,11 +1085,15 @@ class SourceProfile(object):
         
         return(newProf)
         
-    def makeImage(self):
+    def makeImage(self,mapRad=None):
         #make image of source
         #calculate image size
-        nXQuad=self.nRad
-        nYQuad=nXQuad
+        if mapRad==None:
+            nXQuad=self.nRad
+            nYQuad=nXQuad
+        else:
+            nXQuad=int(mapRad)
+            nYQuad=nXQuad
         quadArr=Double2d(nXQuad,nYQuad)
         quadErr=Double2d(nXQuad,nYQuad)
         #print quadArr.dimensions
@@ -1095,9 +1101,9 @@ class SourceProfile(object):
         profInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.profile))
         errInterp=CubicSplineInterpolator(Double1d(self.radArr),Double1d(self.error))
         #fill first quadrant
-        yList=range(nYQuad)
+        yList=range(self.nRad)
         #print MIN(yList),MAX(yList)
-        for x in range(nXQuad):
+        for x in range(self.nRad):
             radList=SQRT(x**2. + Double1d(yList)**2.)
             #print x
             inBeam=radList.where(radList <= self.maxRad)
@@ -1106,10 +1112,10 @@ class SourceProfile(object):
             quadErr[x,inBeam]=errInterp(radList[inBeam])
             
         #fill other quadrants
-        nXIm=2*self.nRad - 1
+        nXIm=2*nXQuad - 1
         nYIm=nXIm
-        cXIm=self.nRad
-        cYIm=self.nRad
+        cXIm=nXQuad
+        cYIm=nYQuad
         #imageArr=Double2d(nXIm,nYIm)
         #imageErr=Double2d(nXIm,nYIm)
         image=SimpleImage()
@@ -1189,7 +1195,7 @@ def convolveProfiles(profile1,profile2,key=None,verbose=False):
         profile1Regrid=profile1.copy()
         profile2Regrid=profile2.copy()
 
-    profile2Regrid=profile2Regrid.normArea()
+    #profile2Regrid=profile2Regrid.normArea()
     #make images of profiles
     image1=profile1Regrid.makeImage()
     #print image1
@@ -1208,10 +1214,10 @@ def convolveProfiles(profile1,profile2,key=None,verbose=False):
 
 def image2ProfCirc(imageIn):
     #assumes an image is square, centred and circularly symmetric
-    nxIn=int(imageIn['image'].meta['naxis1'].long)
-    nyIn=int(imageIn['image'].meta['naxis2'].long)
-    cxIn=nxIn/2
-    cyIn=nyIn/2
+    nxIn=int(imageIn['image'].meta['naxis1'].long)-1
+    nyIn=int(imageIn['image'].meta['naxis2'].long)-1
+    cxIn=nxIn/2-1
+    cyIn=nyIn/2-1
     radArr=Double1d(range(nxIn-cxIn))
     profile=imageIn.getImage()[cxIn:nyIn,cyIn]
     if imageIn.hasError():

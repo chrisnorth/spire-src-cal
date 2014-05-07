@@ -381,7 +381,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
         
         #make blank variable
         srcConv={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
-        #calculate effective beams
+        #calculate effective beams (no source)
         effBeams=sh.calcSpireEffBeam(alphaK,verbose=verbose)
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
@@ -1387,6 +1387,8 @@ def loadMonoBeams(directory=None,verbose=False):
     for n in range(nKey):
         key=keyList[n]
         table=simpleFitsReader(file=os.path.join(directory,fileList[n]))
+        print table
+        print key
         try:
             beamMonoSrcArea[key]
             if verbose:print 'Overwriting %s'%key
