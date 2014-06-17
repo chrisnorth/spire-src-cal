@@ -71,11 +71,27 @@ print 'K4E=',hb.calcK4E()
 print 'KPtoE=',hb.calcKPtoE()
 print 'Omega(alpha=-1)=',hb.calcOmegaEff(-1.0)
 
+##For most the functions used here, there are three optional parameters
+#  - array ('PSW'|'PMW'|'PLW'): calculate for only one band.
+#      Default is to output all bands in a dictionary indexed by 'PSW','PMW','PLW'
+#  - table (Boolean): output the result as a TableDataset, rather than just an array
+#  - verbose (Boolean): print more info (useful for debugging/sanity-checking...)
+
 ## Set range of power laws to use in thie example
 alphaArr=Float1d([-4.0,-3.5,-3.0,-2.5,-2.0,-1.5,-1.0,-0.5,0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0])
 #alphaArr=Float1d(range(-4,5,0.5)) #range of alphas to use.
 
-## Calculate effective beams for a given spectrum
+## Calculate effective beam profiles for a given spectrum
+print '\nTesting hb.calcOmegaEff'
+# 1) single power law spectrum
+effBeam = hb.calcSpireEffBeam(-2.0)
+# 2) single power law spectrum, single band
+effBeamPsw = hb.calcSpireEffBeam(-2.0,array='PSW')
+# 3) single modified black body spectrum
+effBeamT = hb.calcSpireEffBeam_BB(1.75,20.0)
+
+
+## Calculate effective beam areas for a given spectrum
 print '\nTesting hb.calcOmegaEff'
 # 1) single power law spectrum
 print 'OmegaEff(-2)=',hb.calcOmegaEff(-2.0)
