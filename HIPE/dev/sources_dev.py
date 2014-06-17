@@ -84,6 +84,7 @@
 
 import os
 import herschel
+import copy
 from herschel.share.util import Configuration
 from herschel.ia.numeric import Double1d,Float1d,Int1d,Double2d
 from herschel.ia.dataset import TableDataset,Column
@@ -352,7 +353,7 @@ class NoneSourceType(SourceType):
     def calcZeroVal(self,params):
         return(Double.NaN)
         
-    def calcFwhm(self,params):
+    def calcFwhm(self,params=None):
         return(Double.NaN)
     
     def calcScaleWidth(self,params):
@@ -738,7 +739,7 @@ class SourceProfile(object):
         return(self)
 
     def copy(self):
-        return(SourceProfile(radArr=self.radArr,profile=self.profile,error=self.error,originator=self.origSrc,key=self.key))
+        return(copy.deepcopy(self))
 
     def makeTable(self):
         table=TableDataset()
@@ -1014,31 +1015,27 @@ class SourceProfile(object):
                 #check vector lengths
                 assert len(prof2)==len(self.profile),\
                   'Added profile must scalar of of same length as SourceProfile'
-                  
-                assert len(err2)==len(self.profile),\
-                  'Added profile must scalar of of same length as SourceProfile'
-            
+                              
             #add profiles
             newProf.profile = self.profile + prof2
             #set key
             newProf.setKey(key)
             
-            if error!=None:
+            if err2!=None:
             #check whether err2 is scalar of array
                 try:
                     #len doesn't work on scalar
-                    len(prof2)
+                    len(err2)
                     isScal=False
                 except:
                     isScal=True
                 
                 if not isScal:
                     #check vector lengths
-                    assert len(prof2)==len(self.profile),\
-                      'Added profile must scalar of of same length as SourceProfile'
+                    assert len(err2)==len(self.error),\
+                      'Added error must scalar of of same length as SourceProfile'
                       
-                    assert len(err2)==len(self.profile),\
-                      'Added profile must scalar of of same length as SourceProfile'
+                newProf.error = self.error + err2
         #no longer based on SourceType
         newProf.clearOrig()
         
@@ -1083,6 +1080,28 @@ class SourceProfile(object):
         #no longer based on SourceType
         newProf.clearOrig()
         
+        return(newProf)
+        
+    def scaleProf(self,factor):
+        #makes profile wider by factor
+        newProf=self.copy()
+        profInterp=CubicSplineInterpolator(self.radArr,self.profile)
+        errInterp=CubicSplineInterpolator(self.radArr,self.error)
+        radNew=self.radArr / factor
+        radNew[radNew.where(radNew > self.maxRad)]=self.maxRad
+        print self.radArr[0:5],radNew[0:5]
+
+        newProf.profile[:]=-1.
+        newProf.error[:]=-1.
+        inRange=radNew.where(radNew <= self.maxRad)
+        print radNew[inRange][0:5]
+        print newProf.profile[0:5]
+        print self.profile[0:5]
+        print profInterp(radNew)[0:5]
+        newProf.profile[inRange] = profInterp(radNew)
+        newProf.error[inRange] = errInterp(radNew)
+        print self.profile[0:5],newProf.profile[0:5]
+
         return(newProf)
         
     def makeImage(self,mapRad=None):

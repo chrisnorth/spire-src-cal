@@ -190,7 +190,9 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
         reCalc=True
     
     if reCalc:
+        if (verbose):print'Calculating monochromatic areas (key %s)'%srcProf.key
         beamSrcArea = {'PSW': Double.NaN, 'PMW': Double.NaN, 'PLW': Double.NaN}
+        
         if 0.5*srcProf.calcFwhm()<beamRad[10]:
             #quite a small source (< 10 steps in radius array)
             beamProfsFine=fineBeam(beamProfs,0.5*srcProf.calcFwhm())
@@ -293,6 +295,122 @@ def fineBeam(beamProfsIn,scaleWidth,verbose=False):
         beamProfs.getNormAreaCorrectionTable().getColumn(band).data=beamNormNew
         
     return(beamProfs)
+
+#-------------------------------------------------------------------------------
+# Calculate the effective beam profile and area for SPIRE
+def calcSpireSrcBeam(freq0,freq, transm, beamProfs, effFreq, gamma, array, BB=False,temp=20.0,beta=1.8,alpha=-1.0,verbose=False):
+
+    """
+    ========================================================================
+    Computes an effective beam profile for a given source spectrum
+    ***
+    N.B. Computing the beam area this way integrates over frequency *then* radius,
+      while spireEffArea integrates over radius then frequency.
+      The method used here produces areas which area lower by ~0.1%
+    ***
+
+    Inputs:
+      freq:       (array float) frequency vector [Hz] for which monochromatic
+                    beams areas should be calculated
+      transm:     (array float) relative spectral response (RSRF) corresponding to freq
+                    Note that this should *not* include the aperture efficiency
+      beamProfs:  (dataset) PhotRadialCorrBeam object from calibration tree
+      effFreq:    (float) effective frequency [Hz] of array
+      gamma:      (float) Exponent of powerlaw describing FWHM dependence
+                    on frequency
+      array:      (string) spire array ('Psw'|'Pmw'|'Plw')
+      BB:         (boolean) set to use modified black body spectrum with
+                        temperature temp and emissivity index beta
+                    OPTIONAL. Default=False
+      alpha:      (float) Exponent of power-law sky background model
+                        (if BB==False)
+                    OPTIONAL. Default=-1
+      temp:       (float) Dust/sky temperature (if BB=True)
+                    OPTIONAL. Default=20.0
+      beta:       (float) Dust/sky spectral index (if BB=True)
+                    OPTIONAL. Default=1.8
+      verbose:    (boolean) Set to print additional information.
+                    OPTIONAL. Default=False.
+
+    Outputs:
+      (array float) radialised beam profile
+
+    Calculation:
+      Calculates the source spectrum (either modifies black body or power law)
+      Loops over beam radius, and calculates scaled radii for full frequency range
+      For that radius, gets the values of profile at those scaled radii
+      Integrates profile values over frequency, weighted by RSRF
+
+    Dependencies:
+      herschel.ia.numeric.toolbox.interp.LinearInterpolator
+      herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
+      herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
+
+    2014/01/16  C. North  initial version
+
+    """
+
+    h = Constant.H_PLANCK.value
+    k = Constant.K_BOLTZMANN.value
+    c = Constant.SPEED_OF_LIGHT.value
+
+    #
+    # Calculate sky background model
+    #
+    if BB == 1:
+        # Modified black body
+        if verbose:
+            print 'Using greybody with T=%.2f, beta=%.3f'%(temp,beta)
+        fSky  = 2*h * freq**3 / c**2 / (EXP(h*freq/k/temp) - 1.) * freq**beta
+        fSky0 = 2*h * freq0**3 / c**2 / (EXP(h*freq/k/temp) - 1.) * freq0**beta
+    #
+    else:
+        # Power-Law spectrum
+        if verbose:
+            print 'Using power law spectrum with spectral index %.2f'%(alpha)
+        fSky  = freq**alpha
+        fSky0 = freq0**alpha
+
+
+    #integrate transm*fSky over frequency for nomalisation
+    integrator=TrapezoidalIntegrator(min(freq),max(freq))
+    denomInterp=CubicSplineInterpolator(freq,freq0*transm)
+    denomInteg=integrator.integrate(denomInterp)
+
+    #get beam radius list from calibration table
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+    #get core beam profile from calibration table
+    beamCore=beamProfs.getCoreCorrectionTable().getColumn(array).data
+    #create interpolation object
+    beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+
+    #make array for new beam
+    nRad=len(beamRad)
+    maxRad=max(beamRad)
+    effBeam=Float1d(beamRad)
+    #loop over radius
+    for r in range(nRad):
+        #calculate the "scaled" radius for range of frequencies
+        radFreq=beamRad[r]*(freq/effFreq)**-gamma
+        #ensure it doesn't fo beyong maximum radius
+        radFreq[radFreq.where(radFreq > maxRad)]=maxRad
+        #compute value beam profile at each scaled radius
+        beamCoreFreq=beamCoreInt(radFreq)
+        #apply constant beam profile value where appropriate
+        beamConstRad=beamProfs.getConstantCorrection(beamRad[r],array)
+        isConst=beamCoreFreq.where(beamCoreFreq < beamConstRad)
+        beamCoreFreq[isConst]=beamConstRad
+
+        #integrate beamCoreFreq*transm*fSky over frequency
+        numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+        numInteg = integrator.integrate(numInterp)
+
+        #write value into table
+        effBeam[r]=numInteg/denomInteg
+
+    #if verbose:print'calculated area:',effBeamArea
+    return(effBeam)
+
 
 def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     """
