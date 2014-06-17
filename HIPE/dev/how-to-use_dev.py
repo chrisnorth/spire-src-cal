@@ -75,6 +75,7 @@ print 'Omega(alpha=-1)=',hb.calcOmegaEff(-1.0)
 #  - array ('PSW'|'PMW'|'PLW'): calculate for only one band.
 #      Default is to output all bands in a dictionary indexed by 'PSW','PMW','PLW'
 #  - table (Boolean): output the result as a TableDataset, rather than just an array
+#      Note that this doesn't apply to calcSpireEffBeam(_BB)
 #  - verbose (Boolean): print more info (useful for debugging/sanity-checking...)
 
 ## Set range of power laws to use in thie example
