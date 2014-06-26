@@ -749,7 +749,10 @@ class SourceProfile(object):
         table.addColumn('error',Column(self.error,description='error on radial profile'))
         table.meta['nRad']=LongParameter(self.nRad,description='length of radius array')
         table.meta['maxRad']=DoubleParameter(self.maxRad,description='maximum radius')
-        table.meta['key']=StringParameter(self.key,description='unique key')
+        if self.key != None:
+            table.meta['key']=StringParameter(self.key,description='unique key')
+        else:
+            table.meta['key']=StringParameter('None',description='unique key')
         table.meta['fwhm']=DoubleParameter(self.calcFwhm(),description='source FWHM')
         table.meta['area']=DoubleParameter(self.calcArea(),description='source area')
         table.meta['fromSrc']=BooleanParameter(self.fromSrc,description='is profile based on Source')
@@ -801,7 +804,10 @@ class SourceProfile(object):
         self.setRadArr(table['radius'].data)
         self.setProfile(table['profile'].data)
         self.setError(table['error'].data)
-        self.setKey(table.meta['key'].string)
+        if table.meta['key'].string=='None':
+            self.setKey(None)
+        else:
+            self.setKey(table.meta['key'].string)
         self.clearOrig()
         if verbose:
             print 'Reading profile from %s'%(os.path.join(directory,filename))
@@ -816,7 +822,10 @@ class SourceProfile(object):
         self.setRadArr(table['radius'].data)
         self.setProfile(table['profile'].data)
         self.setError(table['error'].data)
-        set.setKey(table.meta['key'].string)
+        if table.meta['key'].string=='None':
+            self.setKey(None)
+        else:
+            set.setKey(table.meta['key'].string)
         if verbose:
             print 'Reading profile from %s'%(os.path.join(directory,filename))
         return self
