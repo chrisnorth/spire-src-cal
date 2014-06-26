@@ -77,7 +77,7 @@
 #
 #  * getCal:
 #     Gets calibration Context from pool or file, and/or checks existing cal.
-#     If no inputs, reads from default pool (currently 'spire_cal_12_2')
+#     If no inputs, reads from default pool
 #     - Inputs:
 #         cal:     [SpireCal context] Calibration Tree (optional)
 #         calTree: [string] Name of calibration tree to read from HSA (optional)
@@ -357,23 +357,6 @@ MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 
 #scriptVersionString = "SpireHandbookBundle.py $Revision: 1.0 $"
 
-
-
-#-------------------------------------------------------------------------------
-#===============================================================================
-#=====                           INPUT PARAMETERS                          =====
-#===============================================================================
-#-------------------------------------------------------------------------------
-#
-## need the calibration tree 
-##
-#cal=spireCal(pool='spire_cal_12_2')
-### alternatively, read from jarFile
-##cal=spireCal(jarFile='spire_cal_12_2.jar')
-#
-##set verbose to print more information during processing
-#verbose = True
-
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                       DEFINE GLOBAL VARIABLES                       =====
@@ -443,7 +426,7 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
                     
     Calculation:
         If spireCalPhot already defined, check it is valid and return
-        If not, and no inputs defined, try to read from local pool "spire_cal_12_2"
+        If not, and no inputs defined, try to read from local pool
         If that fails, try in the following order:
             If cal set, extract PhotCalContext from there
             If calTree set, read from HSA calibration tree
@@ -468,9 +451,9 @@ def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
         #get spireCalTree
         if cal==None and calTree==None and calPool==None and calFile==None:
             #no import provided. do default action
-            defaultPool='spire_cal_12_2'
-            if (verbose):print 'Reading from default pool: %s'%defaultPool
-            cal=spireCal(pool=defaultPool)
+            if (verbose):print 'Reading from default pool'
+            cal=spireCal()
+            if (verbose):print 'Calibration read from default pool: %s'%cal.meta["version"].value
         try:
             #try getting from cal
             spireCalPhot=cal.getPhot()
@@ -3178,7 +3161,7 @@ def spireColCorrTest(beamType='Full',array=None,verbose=False):
         #use all bands
         bands=spireBands()
     
-    calphot=getCal(calPool='spire_cal_12_3')
+    calphot=getCal()
     alphaArr=Float1d(range(-4,5)) #range of alphas to use.
     beamMonoArea=calcBeamMonoArea(beamType=beamType,array=array,verbose=True)
 
