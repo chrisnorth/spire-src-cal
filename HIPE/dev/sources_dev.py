@@ -87,6 +87,7 @@ import herschel
 import copy
 from herschel.share.util import Configuration
 from herschel.ia.numeric import Double1d,Float1d,Int1d,Double2d
+herschel.ia.numeric.toolbox.basic.IsFinite
 from herschel.ia.dataset import TableDataset,Column
 from herschel.ia.dataset import DoubleParameter,LongParameter,StringParameter,BooleanParameter
 from herschel.ia.dataset.image import SimpleImage
@@ -102,7 +103,7 @@ asciiTableWriter=AsciiTableWriterTask()
 simpleFitsWriter=SimpleFitsWriterTask()
 asciiTableReader=AsciiTableReaderTask()
 simpleFitsReader=SimpleFitsReaderTask()
-from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs,Sqrt,Log
+from herschel.ia.numeric.toolbox.basic import Floor,Min,Max,Exp,Cos,Abs,Sqrt,Log,IsFinite
 FLOOR=herschel.ia.numeric.toolbox.basic.Floor.PROCEDURE
 EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
 COS=herschel.ia.numeric.toolbox.basic.Cos.PROCEDURE
@@ -111,6 +112,7 @@ MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 ABS=herschel.ia.numeric.toolbox.basic.Abs.FUNCTION
 SQRT=herschel.ia.numeric.toolbox.basic.Sqrt.PROCEDURE
 LOG=herschel.ia.numeric.toolbox.basic.Log.PROCEDURE
+IS_FINITE=herschel.ia.numeric.toolbox.basic.IsFinite.PREDICATE
 from java.lang import Double,Float,String,Integer
 from java.lang.Math import PI
 from herschel.ia.numeric.toolbox import RealFunction
@@ -822,10 +824,14 @@ class SourceProfile(object):
         self.setRadArr(table['radius'].data)
         self.setProfile(table['profile'].data)
         self.setError(table['error'].data)
-        if table.meta['key'].string=='None':
+        try:
+            if table.meta['key'].string=='None':
+                self.setKey(None)
+            else:
+                self.setKey(table.meta['key'].string)
+        except:
+            if verbose: 'no key in metadata'
             self.setKey(None)
-        else:
-            set.setKey(table.meta['key'].string)
         if verbose:
             print 'Reading profile from %s'%(os.path.join(directory,filename))
         return self
@@ -1254,7 +1260,7 @@ def image2ProfCirc(imageIn):
         error=None
     return(SourceProfile(radArr,profile,error))
 
-def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,dRadArcsec=None,key=None,verbose=False):
+def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,dRadArcsec=None,key=None,pixSize=None,lowCut=None,highCut=None,verbose=False):
     #general script to take a position in a map and create a radial source profile
     assert type(mapIn)==SimpleImage,'mapIn must be a SimpleImage'
     if raCtr!=None and decCtr!=None:
@@ -1270,12 +1276,18 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
         if(verbose):print 'no (raCtr,decCtr) or (xCtr,yCtr) provided. Using centre pixel'
         ctrProvided=False
 
+
     #extract wcs info
     try:
         wcs=mapIn.getWcs()
     except:
         wcs=None
-    assert type(wcs)==Wcs,'Cannot extract WCS from mapIn:'
+#    try:
+#        mapPix=abs(wcs.getCdelt1())
+#    except:
+#        mapPix=pixSize
+#    assert type(wcs)==Wcs,'Cannot extract WCS from mapIn:'
+#    assert mapPix!=None,'Must provide pixSize or use map with WCS'
     naxis1=wcs.getNaxis1()
     naxis2=wcs.getNaxis2()
     #assume map has square pixels
@@ -1288,31 +1300,39 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
     if dRadArcsec==None:
         #use map pixel size as default
         dRadArcsec=mapPixArcsec
+    dRadPix=dRadArcsec/mapPixArcsec
     nRad=int(maxRadArcsec/dRadArcsec)
     if verbose:
         print 'computing radial profile to %g arcsec, with step of %g arcsec'%(maxRadArcsec,dRadArcsec)
     #make radius array
     radArr=Double1d(range(nRad))*dRadArcsec
+    radArrPix=Double1d(range(nRad))*dRadPix
     maxRadDeg=maxRadArcsec/3600.
     #make profile and error arrays
     radProf=Double1d(nRad)
     errProf=Double1d(nRad)
-
+    
     #crop map as appropriate
     if useWcs:
+        print raCtr,decCtr
         [xCtr,yCtr]=wcs.getPixelCoordinates(raCtr,decCtr)
         assert xCtr<naxis1 and xCtr>0 and yCtr<naxis2 and yCtr>0,'centre pixel not in centre of map: [%g,%g]'%(xCtr,yCtr)
+        if verbose: print 'using pixel: (x,y)=(%g,%g) (Ra,Dec)=(%g,%g)'%(xCtr,yCtr,raCtr,decCtr)
     else:
         if not ctrProvided:
             #user central pixel
             xCtr=int(naxis1/2)
             yCtr=int(naxis2/2)
-            if verbose:print 'using centre pixel: (x,y)=(%g,%g) (Ra,Dec)=(%g,%g)'%(xCtr,yCtr,raCtr,decCtr)
-        #get RA,Dec of centre
-        [raCtr,decCtr]=wcs.getWorldCoordinates(xCtr,yCtr)
+            if verbose:print 'using centre pixel: (x,y)=(%g,%g)'%(xCtr,yCtr)
+            print xCtr,yCtr
+        ##get RA,Dec of centre
+        #[raCtr,decCtr]=wcs.getWorldCoordinates(xCtr,yCtr)
+        if verbose:print 'using pixel: (x,y)=(%g,%g)'%(xCtr,yCtr)
+    
     validCrop=False
     redCrop=False
     cropRadPix=maxRadDeg/mapPix
+    
     while validCrop==False:
         #set rows
         row1=int(xCtr - cropRadPix)
@@ -1338,14 +1358,14 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
             #decrease crop radius and start again
             validCrop=False
             redCrop=True
-            cropRadPix=cropRadPix - (row2-naxis1)
+            cropRadPix=cropRadPix - (row2-naxis1 +1)
             if verbose:print 'crop row2>naxis1. Decreasing crop radius to %g'%cropRadPix
         elif column2>=naxis1:
             #column2 > naxis2
             #decrease crop radius and start again
             validCrop=False
             redCrop=True
-            cropRadPix=cropRadPix - (column2-naxis2)
+            cropRadPix=cropRadPix - (column2-naxis2 +1)
             if verbose:print 'crop column2>naxis2. Decreasing crop radius to %g'%cropRadPix
         else:
             validCrop=True
@@ -1360,15 +1380,23 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
     
     #crop map
     mapCrop=crop(image=mapIn,row1=row1,column1=column1,row2=row2, column2=column2)
-    [xCtrCrop,yCtrCrop]=mapCrop.getWcs().getPixelCoordinates(raCtr,decCtr)
+    if useWcs:
+        [xCtrCrop,yCtrCrop]=mapCrop.getWcs().getPixelCoordinates(raCtr,decCtr)
+    else:
+        xCtrCrop=xCtr-row1
+        yCtrCrop=yCtr-column1
     
     #get first histogram
-    mapMax=max(mapCrop.getImage())
-    hist0=circleHistogram(image=mapCrop,lowCut=0.,highCut=mapMax,\
+    if highCut==None:
+        highCut=max(mapCrop.image[mapCrop.image.where(IS_FINITE)])
+    if lowCut==None:
+        lowCut=min(mapCrop.image[mapCrop.image.where(IS_FINITE)])
+    if verbose: print 'calculating profile in range %.3g : %.3g'%(lowCut,highCut)
+    hist0=circleHistogram(image=mapCrop,lowCut=lowCut,highCut=highCut,\
           bins=1000, centerX=xCtrCrop,centerY=yCtrCrop,\
-          radiusArcsec=radArr[0]+dRadArcsec/2.)
-    histVals=hist0.getValues()
+          radiusPixels=radArrPix[0]+dRadPix/2.)
     histThis=hist0.getFrequencies()
+    histVals=hist0.getValues()
     #number of pixels used
     nPixRad=sum(histThis)
     if nPixRad>0:
@@ -1381,17 +1409,17 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
     else:
         #get value and error from central pixel
         radProf[0]=mapCrop.getIntensity(xCtrCrop,yCtrCrop)
-        errProf[0]=mapCrop.getError()[int(xCtrCrop),int(yCtrCrop)]
-        
+        errProf[0]=0.
+    print radProf[0],errProf[0]
     #loop over radii in cropped map
     for r in range(1,nCropRad):
         #compute new max radius
-        rad=radArr[r]+dRadArcsec/2.
+        rad=radArrPix[r]+dRadPix/2.
         #copy previous histogram
         histPrev=histThis.copy()
         #calculate new histogram
-        histThis=circleHistogram(image=mapCrop,lowCut=0.,highCut=mapMax,\
-          bins=1000, centerX=xCtrCrop,centerY=yCtrCrop,radiusArcsec=rad).getFrequencies()
+        histThis=circleHistogram(image=mapCrop,lowCut=lowCut,highCut=highCut,\
+          bins=1000, centerX=xCtrCrop,centerY=yCtrCrop,radiusPixels=rad).getFrequencies()
         #take difference to get histogram for annulus
         histDiff=histThis-histPrev
         nPixRad=sum(histDiff)
