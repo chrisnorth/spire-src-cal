@@ -559,7 +559,8 @@ def getSpireFreq():
         #global variable already defined, so do nothing
     except:
         #not defined, so recalculate
-        deltaNu = 1.e9        # 0.1 GHz
+        deltaNu = 1.e9        # 1.0 GHz
+        deltaNu = 0.1e9        # 0.1 GHz
         nuMin   = 300.e9
         nuMax   = 1800.e9
         nNu     = FLOOR((nuMax-nuMin)/deltaNu)
@@ -1008,8 +1009,8 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
         fSky  = freq**alpha
 
     # Integrate monochromatic area over frequency, weighted by rsrf and fSky
-    numInterp=CubicSplineInterpolator(freq,transm * fSky * monoArea)
-    denomInterp=CubicSplineInterpolator(freq,transm * fSky)
+    numInterp=LinearInterpolator(freq,transm * fSky * monoArea)
+    denomInterp=LinearInterpolator(freq,transm * fSky)
     minFreq=MIN(freq)
     maxFreq=MAX(freq)
     integrator=TrapezoidalIntegrator(minFreq,maxFreq)
@@ -1077,7 +1078,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 
     #integrate to get solid angle (in arcsec^2)
     
-    beamInterp=CubicSplineInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
     integrator=TrapezoidalIntegrator(0,maxRad)
     beamMonoArea=integrator.integrate(beamInterp)
 
@@ -1149,7 +1150,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
         beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,array)[0]
 
     # interpolate to full frequency array and convert to Sr
-    beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
+    beamInterp=LinearInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
     beamMonoArea=beamInterp(freq)*arcsec2Sr() #in sr
     
     return(beamMonoArea)
@@ -1263,8 +1264,8 @@ def calcSpireKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0
         # monoArea is the monochromatic beam solid angle at effFreq
 
     # integrate over frequency
-    numInterp=CubicSplineInterpolator(freq,transm)
-    denomInterp=CubicSplineInterpolator(freq,transm * fSky * area)
+    numInterp=LinearInterpolator(freq,transm)
+    denomInterp=LinearInterpolator(freq,transm * fSky * area)
     minFreq=MIN(freq)
     maxFreq=MAX(freq)
 
@@ -1355,7 +1356,7 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array, BB=False,temp=2
 
     #integrate transm*fSky over frequency for nomalisation
     integrator=TrapezoidalIntegrator(min(freq),max(freq))
-    denomInterp=CubicSplineInterpolator(freq,transm*fSky)
+    denomInterp=LinearInterpolator(freq,transm*fSky)
     denomInteg=integrator.integrate(denomInterp)
 
     #get beam radius list from calibration table
@@ -1363,7 +1364,7 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array, BB=False,temp=2
     #get core beam profile from calibration table
     beamCore=beamProfs.getCoreCorrectionTable().getColumn(array).data
     #create interpolation object
-    beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+    beamCoreInt=LinearInterpolator(beamRad,beamCore)
 
     #make array for new beam
     nRad=len(beamRad)
@@ -1383,13 +1384,13 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array, BB=False,temp=2
         beamCoreFreq[isConst]=beamConstRad
 
         #integrate beamCoreFreq*transm*fSky over frequency
-        numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+        numInterp=LinearInterpolator(freq,beamCoreFreq*transm*fSky)
         numInteg = integrator.integrate(numInterp)
 
         #write value into table
         effBeam[r]=numInteg/denomInteg    
 
-    beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*PI*beamRad)
+    beamInterp = LinearInterpolator(beamRad,effBeam * 2.*PI*beamRad)
     effBeamAreaInt=TrapezoidalIntegrator(0,maxRad)
     effBeamArea=effBeamAreaInt.integrate(beamInterp)
     effBeamDict = {'area':effBeamArea,'profile':effBeam}
@@ -1491,12 +1492,12 @@ def calcSpireEffBeam(alphaK,array=None,verbose=False):
             integrator=TrapezoidalIntegrator(MIN(freq),MAX(freq))
 
             transm=getSpireFilt(rsrfOnly=True)[band]
-            denomInterp=CubicSplineInterpolator(freq,transm*fSky)
+            denomInterp=LinearInterpolator(freq,transm*fSky)
             denomInteg=integrator.integrate(denomInterp)
             #get core beam profile from calibration table
             beamCore=beamProfs.getCoreCorrectionTable().getColumn(band).data
             #create interpolation object
-            beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+            beamCoreInt=LinearInterpolator(beamRad,beamCore)
             
             #make array for new beam
             nRad=len(beamRad)
@@ -1516,7 +1517,7 @@ def calcSpireEffBeam(alphaK,array=None,verbose=False):
                 beamCoreFreq[isConst]=beamConstRad
         
                 #integrate beamCoreFreq*transm*fSky over frequency
-                numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+                numInterp=LinearInterpolator(freq,beamCoreFreq*transm*fSky)
                 numInteg = integrator.integrate(numInterp)
         
                 #write value into table
@@ -1623,13 +1624,13 @@ def calcSpireEffBeam_BB(betaK,tempK,array=None,verbose=False):
             integrator=TrapezoidalIntegrator(MIN(freq),MAX(freq))
         
             transm=getSpireFilt(rsrfOnly=True)[band]
-            denomInterp=CubicSplineInterpolator(freq,transm*fSky)
+            denomInterp=LinearInterpolator(freq,transm*fSky)
             denomInteg=integrator.integrate(denomInterp)
 
             #get core beam profile from calibration table
             beamCore=beamProfs.getCoreCorrectionTable().getColumn(band).data
             #create interpolation object
-            beamCoreInt=CubicSplineInterpolator(beamRad,beamCore)
+            beamCoreInt=LinearInterpolator(beamRad,beamCore)
         
             #make array for new beam
             nRad=len(beamRad)
@@ -1648,7 +1649,7 @@ def calcSpireEffBeam_BB(betaK,tempK,array=None,verbose=False):
                 beamCoreFreq[isConst]=beamConstRad
         
                 #integrate beamCoreFreq*transm*fSky over frequency
-                numInterp=CubicSplineInterpolator(freq,beamCoreFreq*transm*fSky)
+                numInterp=LinearInterpolator(freq,beamCoreFreq*transm*fSky)
                 numInteg = integrator.integrate(numInterp)
         
                 #write value into table
@@ -2797,7 +2798,7 @@ def calcApCorr(alphaK,aperture=None,annulus=[60.,90],array=None,verbose=False,ta
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #create interpolator for computing aperture/annulus size
-    sizeInterp = CubicSplineInterpolator(beamRad,2.*PI*beamRad)
+    sizeInterp = LinearInterpolator(beamRad,2.*PI*beamRad)
     apCorrNoBG = {}
     apCorrIncBG = {}
     for band in bands:
@@ -2815,7 +2816,7 @@ def calcApCorr(alphaK,aperture=None,annulus=[60.,90],array=None,verbose=False,ta
             effBeam=calcSpireEffBeam(alphaK,array=band,verbose=verbose)
             
             #interpolate effective beam profile
-            beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*PI*beamRad)
+            beamInterp = LinearInterpolator(beamRad,effBeam * 2.*PI*beamRad)
             
             #integrate profile to find beam area in aperture/annulus
             omegaAp=integAp.integrate(beamInterp)
@@ -2841,7 +2842,7 @@ def calcApCorr(alphaK,aperture=None,annulus=[60.,90],array=None,verbose=False,ta
                 
 
                 #interpolate effective beam profile
-                beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*PI*beamRad)
+                beamInterp = LinearInterpolator(beamRad,effBeam * 2.*PI*beamRad)
 
                 #integrate profile to find beam area in aperture/annulus
                 omegaAp=integAp.integrate(beamInterp)
@@ -2994,7 +2995,7 @@ def calcApCorr_BB(betaK,tempK,aperture=None,annulus=[60.,90],array=None,verbose=
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #create interpolator for computing aperture/annulus size
-    sizeInterp = CubicSplineInterpolator(beamRad,2.*PI*beamRad)
+    sizeInterp = LinearInterpolator(beamRad,2.*PI*beamRad)
     apCorrNoBG_BB = {}
     apCorrIncBG_BB = {}
     for band in bands:
@@ -3012,7 +3013,7 @@ def calcApCorr_BB(betaK,tempK,aperture=None,annulus=[60.,90],array=None,verbose=
             effBeam=calcSpireEffBeam_BB(betaK,tempK,array=band,verbose=verbose)
             
             #interpolate effective beam profile
-            beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*PI*beamRad)
+            beamInterp = LinearInterperpolator(beamRad,effBeam * 2.*PI*beamRad)
             
             #integrate profile to find beam area in aperture/annulus
             omegaAp=integAp.integrate(beamInterp)
@@ -3036,7 +3037,7 @@ def calcApCorr_BB(betaK,tempK,aperture=None,annulus=[60.,90],array=None,verbose=
                 if verbose:print 'Constructing %s effective beam profile beta=%f, Temp=%f:'%(band,betaK,tempK[t])
                 effBeam=calcSpireEffBeam_BB(betaK,tempK[t],array=band,verbose=verbose)
                 #interpolate effective beam profile
-                beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*PI*beamRad)
+                beamInterp = LinearInterperpolator(beamRad,effBeam * 2.*PI*beamRad)
             
                 #integrate profile to find beam area in aperture/annulus
                 omegaAp=integAp.integrate(beamInterp)
