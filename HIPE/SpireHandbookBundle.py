@@ -542,7 +542,7 @@ def getSpireFreq():
         #global variable already defined, so do nothing
     except:
         #not defined, so recalculate
-        deltaNu = 1.e9        # 0.1 GHz
+        deltaNu = 1.e9        # 1.0 GHz
         nuMin   = 300.e9
         nuMax   = 1800.e9
         nNu     = FLOOR((nuMax-nuMin)/deltaNu)
