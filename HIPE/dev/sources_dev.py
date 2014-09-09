@@ -1360,7 +1360,7 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
             redCrop=True
             cropRadPix=cropRadPix - (row2-naxis1 +1)
             if verbose:print 'crop row2>naxis1. Decreasing crop radius to %g'%cropRadPix
-        elif column2>=naxis1:
+        elif column2>=naxis2:
             #column2 > naxis2
             #decrease crop radius and start again
             validCrop=False
@@ -1387,6 +1387,7 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
         yCtrCrop=yCtr-column1
     
     #get first histogram
+    print len(mapCrop.image[mapCrop.image.where(IS_FINITE)])
     if highCut==None:
         highCut=max(mapCrop.image[mapCrop.image.where(IS_FINITE)])
     if lowCut==None:
