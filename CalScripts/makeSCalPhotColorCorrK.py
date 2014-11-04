@@ -116,7 +116,7 @@ dataDir = Configuration.getProperty('var.hcss.workdir')
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(pool='spire_cal_12_2')
+	cal=spireCal(pool='spire_cal_12_3')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
