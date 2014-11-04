@@ -76,10 +76,15 @@
 #                                     Used for spire_cal_12_1
 #  Chris North   - 26/Feb/2014 - 1.1: Added writing of ascii tables and log file
 #                                   SPCAL-109  
+#  Chris North   - 04-11-2014  - 2.0: Used new beams (no constant section)
+#                                     Changed Neptune beam areas to B. Schulz values
+#                                     "constant" table filled with zeros
+#                                     removed constant beam from calculations where appropriate
 #===============================================================================
 
 import os
-scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.5 $"
+from herschel.share.unit import *
+scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 2.0 $"
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -87,11 +92,11 @@ scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.5 $"
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-directory = "..//..//..//..//..//..//data//spire//cal//SCal"
-dataDir = "//disks//winchester2//calibration_data//"
+#directory = "..//..//..//..//..//..//data//spire//cal//SCal"
+#dataDir = "//disks//winchester2//calibration_data//"
 #LOCAL VERSION
-#directory = Configuration.getProperty('var.hcss.workdir')
-#dataDir = Configuration.getProperty('var.hcss.workdir')
+directory = Configuration.getProperty('var.hcss.workdir')
+dataDir = Configuration.getProperty('var.hcss.workdir')
 
 # if inputCalDirTree is True, then calibration products are read from a
 #  calibration directory tree
@@ -101,7 +106,7 @@ dataDir = "//disks//winchester2//calibration_data//"
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(pool='spire_cal_12_2')
+	cal=spireCal(pool='spire_cal_12_3')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -120,15 +125,28 @@ writeLog = False
 #===============================================================================
 #-------------------------------------------------------------------------------
 # version number
-version = "3"
+version = "4"
 
 # beam version to read in
-beamNewVersion="1.1"
-beamNewFileConstant = 'beamProfs_constant_v%s.csv'%beamNewVersion
-beamNewFileCore = 'beamProfs_core_v%s.csv'%beamNewVersion
+beamNewVersion="4"
 
-beamConstantIn = asciiTableReader(os.path.join(dataDir,beamNewFileConstant))
-beamCoreIn = asciiTableReader(os.path.join(dataDir,beamNewFileCore))
+#read in core beam
+beamCoreIn = TableDataset()
+beamCoreIn.addColumn('radius',Column(Float1d.range(1400),unit=Angle.SECONDS_ARC))
+for band in ['PSW','PMW','PLW']:
+    beamProfIn=asciiTableReader(os.path.join(dataDir,'%s_MCore_9.csv'%band))['c0'].data
+    #beamProfIn=beamProfIn/beamProfIn[0]
+    beamCoreIn.addColumn(band,Column(beamProfIn))
+beamNewFileCore='beamCore_noNorm_v%s.csv'%beamNewVersion
+asciiTableWriter(beamCoreIn,os.path.join(directory,beamNewFileCore))
+
+#create constant beam filled with zeros
+beamConstantIn = TableDataset()
+beamConstantIn.addColumn('radius',Column(Float1d.range(1400),unit=Angle.SECONDS_ARC))
+for band in ['PSW','PMW','PLW']:
+    beamConstantIn.addColumn(band,Column(Float1d(1400)))
+beamNewFileConstant='beamConstant_v%s.csv'%beamNewVersion
+asciiTableWriter(beamConstantIn,os.path.join(directory,beamNewFileConstant))
 
 # set format version and date format
 formatVersion = "1.0"
@@ -140,7 +158,7 @@ verbose = True
 # beam parameters
 arcsec2Sr = (Math.PI/(60.*60.*180))**2
 # area measured on Neptune
-spireAreaEffFreq = {"PSW":450.*arcsec2Sr, "PMW":795.*arcsec2Sr, "PLW":1665.*arcsec2Sr}
+spireAreaEffFreq = {"PSW":454.0*arcsec2Sr, "PMW":803.4*arcsec2Sr, "PLW":1687.0*arcsec2Sr}
 # Neptune spectral index (from ESA4 model)
 alphaNep={"PSW":1.29, "PMW":1.42, "PLW":1.47}
 
@@ -157,7 +175,6 @@ gamma = -0.85
 
 #-------------------------------------------------------------------------------
 # Loading physical constants
-from herschel.share.unit import *
 h = Constant.H_PLANCK.value
 k = Constant.K_BOLTZMANN.value
 c = Constant.SPEED_OF_LIGHT.value
@@ -219,7 +236,7 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Calculate monochromatic beam profile and area at a given frequency
-def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
+def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	"""
 	========================================================================
 	Implements the full beam model to generate the monochromatic beam profile
@@ -231,8 +248,6 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  beamRad:   (array float) radius vector from the input beam profiles
 	  beamProfs: (dataset) PhotRadialCorrBeam object
 	               [used to retrieve core beam profile]
-	  beamConst: (array float) constant part of beam profile for "array"
-                       [passed to prevent repeated calls]
 	  effFreq:   (float) effective frequency [Hz] of array
 	  gamma:     (float) Exponent of powerlaw describing FWHM dependence
 	               on frequency
@@ -253,6 +268,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/07  C. North  removed beamConst (depracated) from calculations
 
 	"""
 
@@ -266,11 +282,14 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
+	
+	####  DEPREACATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	isConst=beamNew.where(beamNew < beamConst)
-	beamNew[isConst]=beamConst[isConst]
-
+	#isConst=beamNew.where(beamNew < beamConst)
+	#beamNew[isConst]=beamConst[isConst]
+	####  /DEPREACATED  ####
+	
 	#integrate to get solid angle (in arcsec^2)
 	
 	beamInterp=LinearInterpolator(beamRad,beamNew * 2. * Math.PI * beamRad)
@@ -313,6 +332,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 	  herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/07  C. North  removed beamConst (depracated) from calculations
 
 	"""
 
@@ -329,9 +349,11 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+	####  DEPRACATED  ####
 	#get constant beam profile from calibration table
 	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-
+	####  /DEPRACATED  ####
+	
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
 		#get corresponding index in full frequency array
@@ -339,7 +361,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 		#populate frequency array
 		beamMonoFreqSparse[fx]=freq[f]
 		#populate beam area array
-		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,array)[0]
+		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,effFreq,gamma,array)[0]
 
 	# interpolate to full frequency array and convert to Sr
 	beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
@@ -559,8 +581,9 @@ beamProfs.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris Nor
 beamProfs["constant"] = beamConstantIn
 beamProfs["core"] = beamCoreIn
 #update labels
+beamProfs["constant"].setDescription("[DEPRACATED, set to zero] Frequency-independent constant part of the radial beam profile")
 beamProfs["core"].setDescription("Frequency-dependent core part of the radial beam profile")
-beamProfs["constant"].setDescription("Frequency-independent constant part of the radial beam profile")
+
 #generate file list (for metadata
 
 # Re-compute normalised beam areas for new beams
@@ -571,22 +594,25 @@ nRad=len(beamRad)
 # Create normArea table
 beamNormArea=TableDataset(description="Area as a function of radius, normalised by final value")
 # add radius column
-beamNormArea.addColumn("radius",Column(Float1d(beamRad)))
+beamNormArea.addColumn("radius",Column(Float1d(beamRad),unit=Angle.SECONDS_ARC))
 
 print 'Calculating normalised beam area...'
 for band in spireBands:
+	print band
 	# add column to table
 	beamNormArea.addColumn(band,Column(Float1d(nRad)))
 	# get core beam
 	beamComb=beamProfs.getCoreCorrectionTable().getColumn(band).data.copy()
+	####  DEPRACATED  ####
 	# get const beam
-	beamConst=beamProfs.getConstantCorrectionTable().getColumn(band).data
+	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(band).data
 	# work out where constant beam applies
-	isConst = beamComb.where(beamComb < beamConst)
+	#isConst = beamComb.where(beamComb < beamConst)
 	# apply constant beam where applicable
-	beamComb[isConst] = beamConst[isConst]
+	#beamComb[isConst] = beamConst[isConst]
+	####  /DEPRACATED  ####
 	# interpolate and integrate
-	beamInterp=CubicSplineInterpolator(beamRad,beamComb*2.*Math.PI*beamRad)
+	beamInterp=CubicSplineInterpolator(Double1d(beamRad),beamComb*2.*Math.PI*beamRad)
 	integrator=TrapezoidalIntegrator(0,max(beamRad))
 	beamTotArea=integrator.integrate(beamInterp)
 	for r in range(nRad):
@@ -627,9 +653,9 @@ beamProfs.meta['alphaNeptunePlw']= DoubleParameter(alphaNep['PLW'],\
 #===============================================================================
 #-------------------------------------------------------------------------------
 #uses existing numbers as initial guess
-spireEffFreq = {"PSW":1217.27*1.e9,\
-	"PMW":867.75*1.e9,\
-	"PLW":610.87*1.e9}
+spireEffFreq = {"PSW":1224.06*1.e9,\
+	"PMW":873.07*1.e9,\
+	"PLW":609.86*1.e9}
 print '\nGenerating new effective frequencies...'
 
 for band in spireBands:
@@ -663,6 +689,7 @@ beamAreaPipSr  = {}
 beamAreaPipArc  = {}
 print '\nCalculating monochromatic beam areas...'
 for band in spireBands:
+	print band
 	#monochromatic beam areas
 	beamMonoArea[band] = spireMonoAreas(freq, beamProfs, 
 	  spireEffFreq[band], gamma, band)
