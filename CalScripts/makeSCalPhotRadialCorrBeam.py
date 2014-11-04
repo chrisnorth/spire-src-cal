@@ -132,7 +132,7 @@ beamNewVersion="4"
 
 #read in core beam
 beamCoreIn = TableDataset()
-beamCoreIn.addColumn('radius',Column(Float1d.range(1400),unit=Angle.SECONDS_ARC))
+beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
 for band in ['PSW','PMW','PLW']:
     beamProfIn=asciiTableReader(os.path.join(dataDir,'%s_MCore_9.csv'%band))['c0'].data
     #beamProfIn=beamProfIn/beamProfIn[0]
@@ -142,9 +142,9 @@ asciiTableWriter(beamCoreIn,os.path.join(directory,beamNewFileCore))
 
 #create constant beam filled with zeros
 beamConstantIn = TableDataset()
-beamConstantIn.addColumn('radius',Column(Float1d.range(1400),unit=Angle.SECONDS_ARC))
+beamConstantIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
 for band in ['PSW','PMW','PLW']:
-    beamConstantIn.addColumn(band,Column(Float1d(1400)))
+    beamConstantIn.addColumn(band,Column(Double1d(1400)))
 beamNewFileConstant='beamConstant_v%s.csv'%beamNewVersion
 asciiTableWriter(beamConstantIn,os.path.join(directory,beamNewFileConstant))
 
