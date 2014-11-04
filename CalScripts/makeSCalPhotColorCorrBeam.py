@@ -84,9 +84,11 @@
 #  Chris North   - 18/Feb/2014 - 1.0: First version (complete calculation)
 #                                     Used for spire_cal_12_1
 #                                 SPCAL-109
+#  Chris North   - 04/Nov/2014 - 2.0: New beams (no constant part)
+#                                     removed constant from calculations where appropriate
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.6 $"
+scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 2.0 $"
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -94,11 +96,11 @@ scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.6 $"
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-directory = "..//..//..//..//..//..//data//spire//cal//SCal"
-dataDir = "//disks//winchester2//calibration_data//"
+#directory = "..//..//..//..//..//..//data//spire//cal//SCal"
+#dataDir = "//disks//winchester2//calibration_data//"
 #LOCAL VERSION
-#directory = Configuration.getProperty('var.hcss.workdir')
-#dataDir = Configuration.getProperty('var.hcss.workdir')
+directory = Configuration.getProperty('var.hcss.workdir')
+dataDir = Configuration.getProperty('var.hcss.workdir')
 
 # if inputCalDirTree is True, then calibration products are read from a
 #  calibration directory tree
@@ -108,7 +110,7 @@ dataDir = "//disks//winchester2//calibration_data//"
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(pool='spire_cal_12_2')
+	cal=spireCal(pool='spire_cal_12_3')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -127,7 +129,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "3"
+version = "4"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -238,7 +240,7 @@ gamma = beamProfs.meta['gamma'].double
 
 #-------------------------------------------------------------------------------
 # Calculate monochromatic beam profile and area at a given frequency
-def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
+def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	"""
 	========================================================================
 	Implements the full beam model to generate the monochromatic beam profile
@@ -250,8 +252,6 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  beamRad:   (array float) radius vector from the input beam profiles
 	  beamProfs: (dataset) PhotRadialCorrBeam object
 	               [used to retrieve core beam profile]
-	  beamConst: (array float) constant part of beam profile for "array"
-                       [passed to prevent repeated calls]
 	  effFreq:   (float) effective frequency [Hz] of array
 	  gamma:     (float) Exponent of powerlaw describing FWHM dependence
 	               on frequency
@@ -272,6 +272,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/04  C. North  removed constant beam from calculation
 
 	"""
 
@@ -285,11 +286,13 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
+	####  DEPRACATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	isConst=beamNew.where(beamNew < beamConst)
-	beamNew[isConst]=beamConst[isConst]
-
+	#isConst=beamNew.where(beamNew < beamConst)
+	#beamNew[isConst]=beamConst[isConst]
+	####  /DEPRACATED  ####
+	
 	#integrate to get solid angle (in arcsec^2)
 	
 	beamInterp=LinearInterpolator(beamRad,beamNew * 2. * Math.PI * beamRad)
@@ -332,6 +335,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 	  herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/04  C. North  removed constant beam from calculations
 
 	"""
 
@@ -348,8 +352,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+	####  DEPRACATED  ####
 	#get constant beam profile from calibration table
 	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+	####  \DEPRACATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -358,7 +364,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 		#populate frequency array
 		beamMonoFreqSparse[fx]=freq[f]
 		#populate beam area array
-		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,array)[0]
+		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,effFreq,gamma,array)[0]
 
 	# interpolate to full frequency array and convert to Sr
 	beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
@@ -445,6 +451,7 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 beamMonoArea={}
 print '\nCalculating monochromatic beam areas...'
 for band in spireBands:
+    print band
 	#monochromatic beam areas
 	beamMonoArea[band] = spireMonoAreas(freq, beamProfs, 
 	  spireEffFreq[band], gamma, band)
