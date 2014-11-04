@@ -451,7 +451,7 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 beamMonoArea={}
 print '\nCalculating monochromatic beam areas...'
 for band in spireBands:
-    print band
+	print band
 	#monochromatic beam areas
 	beamMonoArea[band] = spireMonoAreas(freq, beamProfs, 
 	  spireEffFreq[band], gamma, band)
