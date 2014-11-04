@@ -85,6 +85,8 @@
 #                                     SPCAL-109
 #  Chris North   - 26/Feb/2014        Corrected calls to spireEffBeam and spireEffBeamMap
 #                                     Removed analytical method section
+#  Chris North   - 04/Nov/2014   - Updated to use new beams
+#                                  removed constant beam from calculations where appropriate
 #===============================================================================
 import os
 scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.5 $"
@@ -95,11 +97,11 @@ scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.5 $"
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-directory = "..//..//..//..//..//..//data//spire//cal//SCal"
-dataDir = "//disks//winchester2//calibration_data//"
+#directory = "..//..//..//..//..//..//data//spire//cal//SCal"
+#dataDir = "//disks//winchester2//calibration_data//"
 #LOCAL VERSION
-#directory = Configuration.getProperty('var.hcss.workdir')
-#dataDir = Configuration.getProperty('var.hcss.workdir')
+directory = Configuration.getProperty('var.hcss.workdir')
+dataDir = Configuration.getProperty('var.hcss.workdir')
 
 # if inputCalDirTree is True, then calibration products are read from a
 #  calibration directory tree
@@ -109,7 +111,7 @@ dataDir = "//disks//winchester2//calibration_data//"
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(pool='spire_cal_12_2')
+	cal=spireCal(pool='spire_cal_12_3')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -127,7 +129,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "3"
+version = "4"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -215,12 +217,12 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
-kBeamVersion = "3"
+kBeamVersion = "4"
 kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "3"
+beamProfsVersion = "4"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -252,7 +254,7 @@ gamma = beamProfs.meta['gamma'].double
 
 #-------------------------------------------------------------------------------
 # Calculate monochromatic beam profile and area at a given frequency
-def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
+def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	"""
 	========================================================================
 	Implements the full beam model to generate the monochromatic beam profile
@@ -264,8 +266,6 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  beamRad:   (array float) radius vector from the input beam profiles
 	  beamProfs: (dataset) PhotRadialCorrBeam object
 	               [used to retrieve core beam profile]
-	  beamConst: (array float) constant part of beam profile for "array"
-                       [passed to prevent repeated calls]
 	  effFreq:   (float) effective frequency [Hz] of array
 	  gamma:     (float) Exponent of powerlaw describing FWHM dependence
 	               on frequency
@@ -286,6 +286,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/04  C. North  removed constant from calculations
 
 	"""
 
@@ -299,10 +300,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
+	####  DEPRACATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	isConst=beamNew.where(beamNew < beamConst)
-	beamNew[isConst]=beamConst[isConst]
+	#isConst=beamNew.where(beamNew < beamConst)
+	#beamNew[isConst]=beamConst[isConst]
+	####  /DEPRACATED  ####
 
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -346,6 +349,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 	  herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
 	  
 	2013/12/19  C. North  initial version
+	2014/11/04  C. North  removed constant from calculations
 
 	"""
 
@@ -362,8 +366,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+	####  DEPRACATED  ####
 	#get constant beam profile from calibration table
-	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+	####  /DEPRACATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -372,7 +378,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 		#populate frequency array
 		beamMonoFreqSparse[fx]=freq[f]
 		#populate beam area array
-		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,array)[0]
+		beamMonoAreaSparse[fx]=spireMonoBeam(freq[f],beamRad,beamProfs,effFreq,gamma,array)[0]
 
 	# interpolate to full frequency array and convert to Sr
 	beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
@@ -458,7 +464,7 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array,
 	#make array for new beam
 	nRad=len(beamRad)
 	maxRad=max(beamRad)
-	effBeam=Float1d(beamRad)
+	effBeam=Double1d(beamRad)
 	#loop over radius
 	for r in range(nRad):
 		#calculate the "scaled" radius for range of frequencies
@@ -554,95 +560,95 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 #===============================================================================
 #-------------------------------------------------------------------------------
 ##
-## set up product for no background
-## define the start and end dates for the product
-## starting at beginning of PFM1
-#startDate = df.parse("2005.02.22/00:00:00/GMT")
-#endDate   = df.parse("2020.01.01/00:00:00/GMT")
-#
-#apCorrNoBG = herschel.spire.ia.dataset.PhotColorCorrAperture() 
-#apCorrNoBG.setDescription('SPIRE aperture correction product')
-#apCorrNoBG.meta["creator"].value = scriptVersionString
-#apCorrNoBG.meta["modelName"].value = "FM"
-#apCorrNoBG.meta["creationDate"].value = FineTime(java.util.Date())
-#apCorrNoBG.meta["startDate"].value = FineTime(startDate)
-#apCorrNoBG.meta["endDate"].value = FineTime(endDate)
-#apCorrNoBG.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
-##apCorrNoBG.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="%s"%inputFileName, description="Origin of the data")
-#apCorrNoBG.meta["dependency"].value = "apertureCorrectionType"
-#apCorrNoBG.meta["apertureCorrectionType"] = StringParameter(value="noBG", description="")
-#apCorrNoBG.setVersion(version)
-#apCorrNoBG.setFormatVersion(formatVersion)
-#
-##copy product for including background
-#apCorrIncBG = apCorrNoBG.copy()
-#apCorrNoBG.meta["apertureCorrectionType"] = StringParameter(value="incBG", description="")
-#
-## Create tables for alpha arrays for aperture corrections
-#apCorrNoBG['alpha']=TableDataset(description='Aperture Correction Analytical results without background (Spectral Index)')
-#apCorrIncBG['alpha']=TableDataset(description='Aperture Correction Analytical results including background (Spectral Index)')
-#apCorrNoBG['alpha'].addColumn('alpha',Column(Float1d(alphaK)))
-#apCorrIncBG['alpha'].addColumn('alpha',Column(Float1d(alphaK)))
-#
-## Add columns for aperture corrections
-#for band in spireBands:
-#	apCorrNoBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
-#	apCorrIncBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
-#
-#
-#beamRad = beamProfs['core']['radius'].data
-#sizeInterp = CubicSplineInterpolator(beamRad,2.*Math.PI*beamRad)
-#integBG = TrapezoidalIntegrator(apPhotBGRad['in'],apPhotBGRad['out'])
-#integTot = TrapezoidalIntegrator(0,max(beamRad))
-#sizeBG = integBG.integrate(sizeInterp)
-#
-#for band in spireBands:
-#	integAp = TrapezoidalIntegrator(0,apPhotRad[band])
-#	sizeAp = integAp.integrate(sizeInterp)
-#	apCorrNoBG.meta['sizeAp_%s'%band]=DoubleParameter(sizeAp)
-#	apCorrNoBG.meta['sizeBG_%s'%band]=DoubleParameter(sizeBG)
-#	apCorrIncBG.meta['sizeAp_%s'%band]=DoubleParameter(sizeAp)
-#	apCorrIncBG.meta['sizeBG_%s'%band]=DoubleParameter(sizeBG)
-#
-#print '\nCalculating aperture corrections corrections over alpha (analytical method)...'
-#for band in spireBands:
-#	for a in range(len(alphaK)):
-#		effBeam_x=spireEffBeam(freq,spireFiltOnly[band],beamProfs,spireEffFreq[band],\
-#		  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
-#		print '%s alpha=%.1f'%(band,alphaK[a])
-#		# interpolate beam profile
-#		beamInterp = CubicSplineInterpolator(beamRad,\
-#				effBeam_x['profile'] * 2.*Math.PI*beamRad)
-#		# calculate beam areas in aperture and background annulus
-#		omegaAp = integAp.integrate(beamInterp)
-#		omegaBG = integBG.integrate(beamInterp)
-#		# calculate aperture corrections analytically
-#		apCorrNoBG['alpha'][band].data[a] = \
-#			effBeam_x['area']/omegaAp
-#		apCorrIncBG['alpha'][band].data[a] =  \
-#			effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
-#
-## set FITS filenames
-#if outputCalDirTree:
-#	apCorrNoBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_Analytical_noBG_v%s.fits"%(directory, version))
-#	apCorrIncBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_Analytical_incBG_v%s.fits"%(directory, version))
-#else:
-#	apCorrNoBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_noBG_v%s.fits"%(dataDir, version))
-#	apCorrIncBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_incBG_v%s.fits"%(dataDir, version))
-#apCorrNoBG.meta['fileName'] = herschel.ia.dataset.StringParameter(value=apCorrNoBGFits.name,\
-#  description="Name of file when exported")
-#apCorrIncBG.meta['fileName'] = herschel.ia.dataset.StringParameter(value=apCorrIncBGFits.name,\
-#  description="Name of file when exported")
-#
-##-----------------------------------------------------------------------
-## write to FITS files
-#fitsWriter = FitsArchive()
-#fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
-#fitsWriter.save(apCorrNoBGFits.toString(), apCorrNoBG)
-#
-#fitsWriter = FitsArchive()
-#fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
-#fitsWriter.save(apCorrIncBGFits.toString(), apCorrIncBG)
+# set up product for no background
+# define the start and end dates for the product
+# starting at beginning of PFM1
+startDate = df.parse("2005.02.22/00:00:00/GMT")
+endDate   = df.parse("2020.01.01/00:00:00/GMT")
+
+apCorrNoBG = herschel.spire.ia.dataset.PhotColorCorrAperture() 
+apCorrNoBG.setDescription('SPIRE aperture correction product')
+apCorrNoBG.meta["creator"].value = scriptVersionString
+apCorrNoBG.meta["modelName"].value = "FM"
+apCorrNoBG.meta["creationDate"].value = FineTime(java.util.Date())
+apCorrNoBG.meta["startDate"].value = FineTime(startDate)
+apCorrNoBG.meta["endDate"].value = FineTime(endDate)
+apCorrNoBG.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
+#apCorrNoBG.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="%s"%inputFileName, description="Origin of the data")
+apCorrNoBG.meta["dependency"].value = "apertureCorrectionType"
+apCorrNoBG.meta["apertureCorrectionType"] = StringParameter(value="noBG", description="")
+apCorrNoBG.setVersion(version)
+apCorrNoBG.setFormatVersion(formatVersion)
+
+#copy product for including background
+apCorrIncBG = apCorrNoBG.copy()
+apCorrNoBG.meta["apertureCorrectionType"] = StringParameter(value="incBG", description="")
+
+# Create tables for alpha arrays for aperture corrections
+apCorrNoBG['alpha']=TableDataset(description='Aperture Correction Analytical results without background (Spectral Index)')
+apCorrIncBG['alpha']=TableDataset(description='Aperture Correction Analytical results including background (Spectral Index)')
+apCorrNoBG['alpha'].addColumn('alpha',Column(Float1d(alphaK)))
+apCorrIncBG['alpha'].addColumn('alpha',Column(Float1d(alphaK)))
+
+# Add columns for aperture corrections
+for band in spireBands:
+	apCorrNoBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
+	apCorrIncBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
+
+
+beamRad = beamProfs['core']['radius'].data
+sizeInterp = CubicSplineInterpolator(Double1d(beamRad),2.*Math.PI*beamRad)
+integBG = TrapezoidalIntegrator(apPhotBGRad['in'],apPhotBGRad['out'])
+integTot = TrapezoidalIntegrator(0,max(beamRad))
+sizeBG = integBG.integrate(sizeInterp)
+
+for band in spireBands:
+	integAp = TrapezoidalIntegrator(0,apPhotRad[band])
+	sizeAp = integAp.integrate(sizeInterp)
+	apCorrNoBG.meta['sizeAp_%s'%band]=DoubleParameter(sizeAp)
+	apCorrNoBG.meta['sizeBG_%s'%band]=DoubleParameter(sizeBG)
+	apCorrIncBG.meta['sizeAp_%s'%band]=DoubleParameter(sizeAp)
+	apCorrIncBG.meta['sizeBG_%s'%band]=DoubleParameter(sizeBG)
+
+print '\nCalculating aperture corrections corrections over alpha (analytical method)...'
+for band in spireBands:
+	for a in range(len(alphaK)):
+		effBeam_x=spireEffBeam(freq,spireFiltOnly[band],beamProfs,spireEffFreq[band],\
+		  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
+		print '%s alpha=%.1f'%(band,alphaK[a])
+		# interpolate beam profile
+		beamInterp = CubicSplineInterpolator(beamRad,\
+				effBeam_x['profile'] * 2.*Math.PI*beamRad)
+		# calculate beam areas in aperture and background annulus
+		omegaAp = integAp.integrate(beamInterp)
+		omegaBG = integBG.integrate(beamInterp)
+		# calculate aperture corrections analytically
+		apCorrNoBG['alpha'][band].data[a] = \
+			effBeam_x['area']/omegaAp
+		apCorrIncBG['alpha'][band].data[a] =  \
+			effBeam_x['area']/(omegaAp - omegaBG*sizeAp/sizeBG)
+
+# set FITS filenames
+if outputCalDirTree:
+	apCorrNoBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_Analytical_noBG_v%s.fits"%(directory, version))
+	apCorrIncBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_Analytical_incBG_v%s.fits"%(directory, version))
+else:
+	apCorrNoBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_noBG_v%s.fits"%(dataDir, version))
+	apCorrIncBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_incBG_v%s.fits"%(dataDir, version))
+apCorrNoBG.meta['fileName'] = herschel.ia.dataset.StringParameter(value=apCorrNoBGFits.name,\
+  description="Name of file when exported")
+apCorrIncBG.meta['fileName'] = herschel.ia.dataset.StringParameter(value=apCorrIncBGFits.name,\
+  description="Name of file when exported")
+
+#-----------------------------------------------------------------------
+# write to FITS files
+fitsWriter = FitsArchive()
+fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.save(apCorrNoBGFits.toString(), apCorrNoBG)
+
+fitsWriter = FitsArchive()
+fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.save(apCorrIncBGFits.toString(), apCorrIncBG)
 
 #-------------------------------------------------------------------------------
 #===============================================================================
