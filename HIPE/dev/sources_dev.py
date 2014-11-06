@@ -64,7 +64,7 @@
 #   An object containing a radial Fourier transform of a source profile
 #   Initialisation:
 #     RftProfile(): create empty object
-#     RftProfile(kArr,rftProfile): create object containing kArr, rftProfile
+#     (kArr,rftProfile): create object containing kArr, rftProfile
 #   Contains:
 #     kArr: radius vector
 #     nK: length of kArr vector
@@ -654,7 +654,7 @@ class SourceProfile(object):
 
     def setRadArr(self,radArr=None):
         #set radArr, nRad and maxRad
-        self.radArr=radArr or None
+        self.radArr=Double1d(radArr) or None
         if self.radArr:
             self.nRad=len(radArr)
             self.maxRad=MAX(radArr)
@@ -679,7 +679,7 @@ class SourceProfile(object):
             else:
                 assert len(profile)==self.nRad,\
                   'profile array must be same length as rad array'
-                self.profile=profile
+                self.profile=Double1d(profile)
         return(self)
         
     def setError(self,error=None):
@@ -978,7 +978,7 @@ class SourceProfile(object):
                 profInterp=CubicSplineInterpolator(self.profile,self.radArr)
                 profHalf=self.profile[0]/2.
                 srcFwhm=2.*profInterp(profHalf)
-                print 'interpolated:',profHalf
+                #print 'interpolated:',profHalf
                 broken
             except:
                 #step through manually
@@ -1295,6 +1295,7 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
     mapPixArcsec=mapPix*3600.
     mapXRadArcsec=naxis1*mapPix
     mapYRadArcsec=naxis2*mapPix
+    #print naxis1,naxis2
     
     #set up radius array
     if dRadArcsec==None:
@@ -1387,7 +1388,7 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
         yCtrCrop=yCtr-column1
     
     #get first histogram
-    print len(mapCrop.image[mapCrop.image.where(IS_FINITE)])
+    #print len(mapCrop.image[mapCrop.image.where(IS_FINITE)])
     if highCut==None:
         highCut=max(mapCrop.image[mapCrop.image.where(IS_FINITE)])
     if lowCut==None:
@@ -1411,7 +1412,7 @@ def map2Prof(mapIn,raCtr=None,decCtr=None,xCtr=None,yCtr=None,maxRadArcsec=700.,
         #get value and error from central pixel
         radProf[0]=mapCrop.getIntensity(xCtrCrop,yCtrCrop)
         errProf[0]=0.
-    print radProf[0],errProf[0]
+    #print radProf[0],errProf[0]
     #loop over radii in cropped map
     for r in range(1,nCropRad):
         #compute new max radius
