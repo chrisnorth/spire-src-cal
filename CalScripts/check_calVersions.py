@@ -293,7 +293,7 @@ for band in spireBands:
 	pKExtda.addLayer(LayerXY(KExtd2['alpha']['alpha'].data,\
 		1.-KExtd2['alpha'][band].data/KExtd1['alpha'][band].data, \
 		color=cols[band],name='%s'%(band)))
-	pKExtda.setTitleText('Point Source Correction (alpha)')
+	pKExtda.setTitleText('Extended Source Correction (alpha)')
 	pKExtda.yaxis.titleText = '1-%s/%s'%(verKExtd[1]['name'],verKExtd[0]['name'])
 	pKExtda.xaxis.titleText = 'Spectral index'
 	pKExtda.setSubtitleText('MIN=%.5g MAX=%.5g'%\
@@ -305,7 +305,7 @@ for band in spireBands:
 	pKExtdt.addLayer(LayerXY(KExtd2['beta_2_00']['Temperature'].data,\
 		1.-KExtd2['beta_2_00'][band].data/KExtd1['beta_2_00'][band].data, \
 		color=cols[band],name='%s'%(band)))
-	pKExtdt.setTitleText('Point Source Correction (beta=2.0)')
+	pKExtdt.setTitleText('Extended Source Correction (beta=2.0)')
 	pKExtdt.yaxis.titleText = '1-%s/%s'%(verKExtd[1]['name'],verKExtd[0]['name'])
 	pKExtdt.xaxis.titleText = 'Temperature (K)'
 	pKExtdt.setSubtitleText('MIN=%.5g MAX=%.5g'%\
