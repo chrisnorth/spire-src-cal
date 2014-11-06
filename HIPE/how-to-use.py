@@ -26,42 +26,54 @@
 #-------------------------------------------------------------------------------
 
 #
-##Need to make sure SpireHandbookBundle_dev.py is in HIPE path
-##Import it as a module
-import SpireHandbookBundle_dev as hb
-## An alternative is to import all the functions (and global variables directly)
-#from SpireHandbookBundle_dev import *
-## or just opened the script and execute in HIPE (or use to execfile())
-## However, the examples below assume it has been import as hb
+##Need to make sure SpireHandbookBundle.py is in HIPE path
+#specify directory where script are stored and add to path
+directory  = Configuration.getProperty('var.hcss.workdir')
+import sys
+sys.path.append(directory)
+##Import Handbook module
+import SpireHandbookBundle as hb
 
-## If required, specify a calibration version (default is to use spire_cal_12_2)
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                  SPECIFY CALIBRATION TREE (OPTIONAL                 =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+
+## OPTIONAL: Specify a specific calibration version or calibration tree.
+## Default is to use the version obtained by running spireCal()
 ## 1) Can be read from pool
-#hb.getCal(calPool='spire_cal_12_2')
-## 2) or from HSA
-#hb.getCal(calTree='spire_cal_12_2')
-## 3) or from jarfile
-#hb.getCal(calFile='spire_cal_12_2')
-## 4) or read a calibration and check
-#cal=spireCal()
-#hp.getCal(cal=cal)
+#hb.getCal(calPool='spire_cal_12_3')
 
-## If no calibration specified, default is used. Equivalent to
-#hb.getCal()
+## 2) or from HSA
+#hb.getCal(calTree='spire_cal_12_3')
+
+## 3) or from jar file
+#hb.getCal(calFile='spire_cal_12_3')
+
+## 4) or read a calibration, make modifications, use that
+#cal_mod=spireCal()
+#<make modifications>
+#hp.getCal(cal=cal_mod)
 
 ## The calibration is then used for all the processes in the module
 
 ## By default, the module uses the full beam treatment to calculate the 
 ## monochromatic beam areas, and since this is relatively slow, only calculates
-## them once. This is done as required, but can be achieved manually by
+## them once. This is done as and when required, but can be achieved manually by
 hb.calcBeamMonoArea()
 ## To use a simple beam treatment, which scales the Neptune areas by nu^2*gamma,
-## set beamType='Simple'
+## set beamType='Simple'. This is quicker, but slightly less accurate.
 #hb.calcBeamMonoArea(beamType='Simple')
 
 ## The monochromatic beam areas can be recalculated by re-running the
-## calcBeamMonoArea() function with beamType='Simple' or 'Full'
+## calcBeamMonoArea() function with beamType='Simple' or 'Full'.
 
-## 
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                     CALCULATE PIPELINE PARAMETERS                   =====
+#===============================================================================
+#-------------------------------------------------------------------------------
 
 ## Calculate pipeline parameters
 print 'Testing pipeline parameters'
@@ -77,6 +89,12 @@ print 'Omega(alpha=-1)=',hb.calcOmegaEff(-1.0)
 #  - table (Boolean): output the result as a TableDataset, rather than just an array
 #      Note that this doesn't apply to calcSpireEffBeam(_BB)
 #  - verbose (Boolean): print more info (useful for debugging/sanity-checking...)
+
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====            CALCULATE BEAM PROFILES< AREAS AND CORRECTIONS           =====
+#===============================================================================
+#-------------------------------------------------------------------------------
 
 ## Set range of power laws to use in thie example
 alphaArr=Float1d([-4.0,-3.5,-3.0,-2.5,-2.0,-1.5,-1.0,-0.5,0.0,0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0])
@@ -115,6 +133,12 @@ print 'KBeam(1.75,20)=',hb.calcKBeam_BB(1.75,20.0)
 # 4) multiple modified black body spectrum
 KBeam_BB = hb.calcKBeam_BB(1.75,[20.0,30.,40.])
 
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                      CALCULATE COLOUR CORRECTIONS                   =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+
 ## Calculate point source colour corrections
 print '\nTesting hb.calcKColP'
 # 1) single power law spectrum
@@ -136,6 +160,12 @@ KColE = hb.calcKColE(alphaArr)
 print 'KColE(1.75,20)=',hb.calcKColE_BB(1.75,20.0)
 # 4) multiple modified black body spectrum
 KColE_BB = hb.calcKColE_BB(1.75,[20.0,30.,40.])
+
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                     CALCULATE APERTURE CORRECTIONS                  =====
+#===============================================================================
+#-------------------------------------------------------------------------------
 
 ## Calculate aperture corrections (can be slow)
 #print '\nTesting aperture corrections'
@@ -159,7 +189,7 @@ apCorrNoBG_BB=apCorr_BB[1]
 
 #-------------------------------------------------------------------------------
 #===============================================================================
-#=====                          INTERNAL VARIABLES                         =====
+#=====                  INTERNAL VARIABLES (POWER USERS ONLY               =====
 #===============================================================================
 #-------------------------------------------------------------------------------
 ## As part of its processing the module uses some global variables
