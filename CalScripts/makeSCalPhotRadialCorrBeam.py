@@ -135,7 +135,8 @@ beamCoreIn = TableDataset()
 beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
 for band in ['PSW','PMW','PLW']:
     beamProfIn=asciiTableReader(os.path.join(dataDir,'%s_MCore_9.csv'%band))['c0'].data
-    #beamProfIn=beamProfIn/beamProfIn[0]
+    #set central pixel to 1
+    beamProfIn[0]=1.0
     beamCoreIn.addColumn(band,Column(beamProfIn))
 beamNewFileCore='beamCore_noNorm_v%s.csv'%beamNewVersion
 asciiTableWriter(beamCoreIn,os.path.join(directory,beamNewFileCore))
