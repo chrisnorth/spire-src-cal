@@ -127,9 +127,6 @@ writeLog = False
 # version number
 version = "4"
 
-# beam version to read in
-beamNewVersion="4"
-
 #read in core beam
 beamCoreIn = TableDataset()
 beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
@@ -138,7 +135,7 @@ for band in ['PSW','PMW','PLW']:
     #set central pixel to 1
     beamProfIn[0]=1.0
     beamCoreIn.addColumn(band,Column(beamProfIn))
-beamNewFileCore='beamCore_noNorm_v%s.csv'%beamNewVersion
+beamNewFileCore='beamCore_noNorm_v%s.csv'%version
 asciiTableWriter(beamCoreIn,os.path.join(directory,beamNewFileCore))
 
 #create constant beam filled with zeros
@@ -146,7 +143,7 @@ beamConstantIn = TableDataset()
 beamConstantIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
 for band in ['PSW','PMW','PLW']:
     beamConstantIn.addColumn(band,Column(Double1d(1400)))
-beamNewFileConstant='beamConstant_v%s.csv'%beamNewVersion
+beamNewFileConstant='beamConstant_v%s.csv'%version
 asciiTableWriter(beamConstantIn,os.path.join(directory,beamNewFileConstant))
 
 # set format version and date format
