@@ -135,7 +135,7 @@ for band in ['PSW','PMW','PLW']:
     #set central pixel to 1
     beamProfIn[0]=1.0
     beamCoreIn.addColumn(band,Column(beamProfIn))
-beamNewFileCore='beamCore_noNorm_v%s.csv'%version
+beamNewFileCore='beamCore_v%s.csv'%version
 asciiTableWriter(beamCoreIn,os.path.join(directory,beamNewFileCore))
 
 #create constant beam filled with zeros

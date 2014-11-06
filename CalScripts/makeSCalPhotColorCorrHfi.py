@@ -186,7 +186,7 @@ if inputCalDirTree:
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
  
 	# SPIRE Photometer radial beam profiles from cal directory tree
-	beamProfsVersion = "3"
+	beamProfsVersion = "4"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 
 	# SPIRE Photometer FluxConv from cal directory tree (for K4P and K4E parameters)
