@@ -89,12 +89,33 @@ EXP=herschel.ia.numeric.toolbox.basic.Exp.PROCEDURE
 MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
 MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 
-import SpireHandbookBundle_dev as sh
-import beamfunctions as beam
-import sources_dev as srcMod
-from SpireHandbookBundle_dev import spireBands
+import SpireHandbookBundle as sh
+import sources as src
 #scriptVersionString = "SemiExtendedBundle.py $Revision: 1.0 $"
     
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                           SETUP FUNCTIONS                           =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+
+def spireBands():
+    """
+    ========================================================================
+    spireBands():
+        Return list of bands for addessing dicts: ["PSW","PMW",PLW"]
+        
+    Inputs:
+        NONE
+        
+    Outputs:
+        (string list) list of beam names
+        
+    Calculation:
+        ['PSW','PMW','PLW']
+    """
+    return(['PSW','PMW','PLW'])
+
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                  CALCULATE MONOCHROMATIC BEAM AREAS                 =====
@@ -151,20 +172,20 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
 
     global beamMonoSrcArea
 
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src mus be either Source or SourceProfile object'
     #read in beamProfiles
     beamProfs = sh.getCal().getProduct("RadialCorrBeam")
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
 
-    if type(src)==srcMod.Source:
+    if type(src)==src.Source:
         #create source profile
         
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==srcMod.SourceProfile:
+    elif type(src)==src.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
 
@@ -212,7 +233,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
                 for band in spireBands():
                     #monochromatic beam areas
                     gamma = beamProfsFine.meta['gamma'].double
-                    beamSrcArea[band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfsFine, 
+                    beamSrcArea[band] = spireMonoSrcAreas(sh.getSpireFreq(), beamProfsFine, 
                       sh.getSpireEffFreq()[band], gamma, srcProfFine, band)
         else:
             #calculate area of beam and source
@@ -226,7 +247,7 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
                 srcProfRegrid=srcProf.copy()
             for band in spireBands():
                 #monochromatic beam areas
-                beamSrcArea[band] = beam.spireMonoSrcAreas(sh.getSpireFreq(), beamProfs, 
+                beamSrcArea[band] = spireMonoSrcAreas(sh.getSpireFreq(), beamProfs, 
                   sh.getSpireEffFreq()[band], gamma, srcProfRegrid, band)
 
     if srcProf.key!=None:
@@ -448,7 +469,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     """
     
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     #make global variable
@@ -458,13 +479,13 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     beamProfs=sh.getCal().getProduct('RadialCorrBeam')
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
         
-    if type(src)==srcMod.Source:
+    if type(src)==src.Source:
         #create source profile
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==srcMod.SourceProfile:
+    elif type(src)==src.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
         if verbose:print'Using SourceProfile %s'%(srcProf.key)
@@ -504,9 +525,9 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_alpha_%g_%s'%(alphaK,band))
+            effBeamProfile=src.SourceProfile(beamRad,effBeam_x,key='EffBeam_alpha_%g_%s'%(alphaK,band))
             effBeamNormProfile=effBeamProfile.normArea()
-            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose,key='%s_%s'%(effBeamKey,band))
+            srcConv[band]=src.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
             
@@ -549,7 +570,7 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
     """
     
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     #make global variable
@@ -559,13 +580,13 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
     beamProfs=sh.getCal().getProduct('RadialCorrBeam')
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
         
-    if type(src)==srcMod.Source:
+    if type(src)==src.Source:
         #create source profile
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==srcMod.SourceProfile:
+    elif type(src)==src.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
         if verbose:print'Using SourceProfile %s'%(srcProf.key)
@@ -605,10 +626,10 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_beta_%g_temp_%g_%s'%(betaK,tempK,band))            
+            effBeamProfile=src.SourceProfile(beamRad,effBeam_x,key='EffBeam_beta_%g_temp_%g_%s'%(betaK,tempK,band))            
             effBeamNormProfile=effBeamProfile.normArea()
                         
-            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,key='%s_%s'%(effBeamKey,band))
+            srcConv[band]=src.convolveProfiles(srcProf,effBeamNormProfile,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
 
@@ -669,7 +690,7 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4P=sh.calcK4P()
@@ -787,7 +808,7 @@ def calcKColPSrc_BB(betaK,tempK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4P=sh.calcK4P()
@@ -902,7 +923,7 @@ def calcKColESrc(alphaK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4E_Tot=sh.calcKMonE()
@@ -999,7 +1020,7 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
             
     k4E_Tot=sh.calcKMonE()
@@ -1090,7 +1111,7 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     """
     
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
     #read aperture from input
     assert type(aperture)==list,'aperture must be 3-element list'
@@ -1138,7 +1159,7 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #calculate SourceProfile from src (if necessary)
-    if type(src)==srcMod.Source:
+    if type(src)==src.Source:
         srcProf=src.calcProfile(beamRad)
     else:
         if src.checkRadArr(beamRad):
@@ -1290,7 +1311,7 @@ def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],ve
     """
     
     #check type of src
-    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
+    assert type(src)==src.Source or type(src)==src.SourceProfile,\
       'src must be Source object or SourceProfile object'
     #read aperture from input
     assert type(aperture)==list,'aperture must be 3-element list'
@@ -1338,7 +1359,7 @@ def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],ve
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #calculate SourceProfile from src (if necessary)
-    if type(src)==srcMod.Source:
+    if type(src)==src.Source:
         srcProf=src.calcProfile(beamRad)
     else:
         if src.checkRadArr(beamRad):
@@ -1568,9 +1589,174 @@ def loadEffBeams(directory=None,verbose=False):
             effBeamSrcProfs[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
         for band in spireBands():
             table=simpleFitsReader(file=os.path.join(directory,fileList[band][n]))
-            effBeamSrcProfs[key][band]=srcMod.SourceProfile().loadFits(directory=directory,filename=fileList[band][n],verbose=verbose)
+            effBeamSrcProfs[key][band]=src.SourceProfile().loadFits(directory=directory,filename=fileList[band][n],verbose=verbose)
     if verbose:print 'effBeamSrcProfs read from files in %s'%directory
+
+#-------------------------------------------------------------------------------
+# Calculate monochromatic beam profile and area at a given frequency (Eq. 5.32) 
+def spireMonoBeamSrc(freqx,beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array):
+    """
+    ========================================================================
+    Implements the full beam model, convolved with a source profile,
+    to generate the monochromatic beam profile and corresponding monochromatic
+    beam solid angle at a given frequency.
+
+    Inputs:
+      freqx:     (float) frequency [Hz] for which monochromatic beam
+                   profile and area should be calculated
+      beamRad:   (array float) radius vector from the input beam profiles
+      beamProfs: (dataset) PhotRadialCorrBeam object
+                   [used to retrieve core beam profile]
+      beamConst: (array float) constant part of beam profile for "array"
+                       [passed to prevent repeated calls]
+      effFreq:   (float) effective frequency [Hz] of array
+      gamma:     (float) Exponent of powerlaw describing FWHM dependence
+                   on frequency
+      srcProf:   (array float) source density profile, corresponding to
+                   radius column in beamProfs
+      array:     (string) spire array ('Psw'|'Pmw'|'Plw')
+
+    Outputs:     (list of objects)
+                (float) Beam area [arcsec^2] at frequency freqx
+
+    Calculation:
+      Scales the core beam profile width as (freqx/effFreq)^gamma.
+      Queries the calibration file to generate new core beam profile.
+      Uses constant beam profile where it is larger than core profile.
+      Multiplies by a source profile
+      Integrates over radius to calculate beam area.
+
+    Dependencies:
+      herschel.ia.numeric.toolbox.interp.LinearInterpolator
+      herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
+      
+    2013/12/19  C. North  initial version
+
+    """
+
     
+    #calculate the "scaled" radius, as nu^-gamma
+    radNew=beamRad*(freqx/effFreq)**-gamma
+    maxRad=max(beamRad)
+    nRad=len(beamRad)
+    #ensure it doesn't go out of range
+    radNew[radNew.where(radNew > maxRad)]=maxRad
+    #get the corresponding beam profiles
+    beamNew=Double1d(nRad)
+    for r in range(nRad):
+        beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
+    #apply the "constant" beam where appropriate
+    #beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+    isConst=beamNew.where(beamNew < beamConst)
+    beamNew[isConst]=beamConst[isConst]
+
+    #copy source Profile and multiply by beam
+    beamNew = srcProf.copy().mult(beamNew,key='Src x Beam')
+    beamMonoArea = beamNew.calcArea()
+    
+    if beamMonoArea==0:
+        print 'calculated area=0'
+        #try just the source
+        srcArea=srcProf.calcArea(forceAnalytical=True)
+        if Double.isNaN(srcArea):
+            #no analytical source
+            print 'Source is very small. No analytical area for source'
+        else:
+            print 'Source is very small. Replacing area with analytical area of source'
+            beamMonoArea=srcArea
+
+
+    ## THIS IS ONLY VALID FOR AREA
+    ## FULL PROFILE OF CONVOLUTION REQUIRES PROPER CONVOLUTION
+
+    #integrate to get solid angle (in arcsec^2)    
+    #beamNew=beamNew * srcProf.profile
+    #beamInterp=LinearInterpolator(beamRad,beamNew * 2. * PI * beamRad)
+    #integrator=TrapezoidalIntegrator(0,maxRad)
+    #beamMonoArea=integrator.integrate(beamInterp)
+
+    return (beamMonoArea,beamNew.profile)
+
+#-------------------------------------------------------------------------------
+# Calculate monochromatic beam areas over a range of frequencies
+def spireMonoSrcAreas(freq,beamProfs,effFreq,gamma,srcProf,array,freqFact=100):
+
+    """
+    ========================================================================
+    Generates array of monochromatic beam areas over frequency range by
+    calculating over a sparser array and interpolating
+
+    Inputs:
+      freq:      (array float) frequency vector [Hz] for which monochromatic
+                   beams areas should be calculated
+      beamProfs: (dataset) PhotRadialCorrBeam object from calibration tree
+      effFreq:   (float) effective frequency [Hz] of array
+      gamma:     (float) Exponent of powerlaw describing FWHM dependence
+                   on frequency
+      array:     (string) spire array ('Psw'|'Pmw'|'Plw')
+      srcProf:   (array float) source density profile, corresponding to
+                   radius column in beamProfs
+      freqFact:  (int) Factor by which to reduce size of freq.
+                   OPTIONAL. Default=100.
+
+    Outputs:     
+                 (array float) Monochromatic Beam area [sr] at frequencies
+                    corresponding to freq
+
+    Calculation:
+      Generates sparse frequency array of full range
+      Uses spireMonoBeam to calculate monochromatic area of beam convolved with 
+        a source profile at sparse freqs
+      Interpolates to full frequency grid
+
+    Dependencies:
+      spireMonoBeam
+      herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
+      
+    2013/12/19  C. North  initial version
+
+    """
+    
+    arcsec2Sr = (PI/(60.*60.*180))**2
+
+    #set up a sparser range of frequencies (otherwise it takes too long)
+    nNu=len(freq)
+    nNuArea=nNu/freqFact + 1
+    #array of indices of full frequency array to use
+    iNuArea=Int1d(range(nNuArea))*freqFact
+    iNuArea[-1]=nNu-1
+
+    #set up arrays
+    beamMonoFreqSparse=Double1d(nNuArea)
+    beamMonoAreaSparse=Double1d(nNuArea)
+
+    #get beam radius array from calibration table
+    beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
+    #get constant beam profile from calibration table
+    beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
+
+    # calculate at sparse frequencies
+    for fx in range(nNuArea):
+        #get corresponding index in full frequency array
+        f=iNuArea[fx]
+        #populate frequency array
+        beamMonoFreqSparse[fx]=freq[f]
+        #populate beam area array
+        beamMonoAreaSparse[fx]=spireMonoBeamSrc(freq[f],beamRad,beamProfs,beamConst,effFreq,gamma,srcProf,array)[0]
+
+    # interpolate to full frequency array and convert to Sr
+    beamInterp=CubicSplineInterpolator(beamMonoFreqSparse,beamMonoAreaSparse)
+    beamMonoArea=beamInterp(freq)*arcsec2Sr #in sr
+    
+    return(beamMonoArea)
+
+
+#-------------------------------------------------------------------------------
+#===============================================================================
+#=====                            TEST FUNCTIONS                           =====
+#===============================================================================
+#-------------------------------------------------------------------------------
+
 def semiExtendedTest():
     """
     ================================================================================
@@ -1625,7 +1811,7 @@ def semiExtendedTest():
     KColP_partialPLW=[]
     
     for wid in srcWidths:
-        src=srcMod.Source('Gaussian',[wid])
+        src=src.Source('Gaussian',[wid])
         #calculate colour corrections from source
         KColP_partial=calcKColPSrc(alphaK,src,verbose=True,table=False)
         KColE_partial=calcKColESrc(alphaK,src,verbose=True,table=False)
@@ -1661,7 +1847,7 @@ def testApCorr():
     apCorrIncBG_partialPMW=[]
     apCorrIncBG_partialPLW=[]
     for wid in srcWidths:
-        src=srcMod.Source('Gaussian',[wid])
+        src=src.Source('Gaussian',[wid])
         
         apCorrBoth=calcApCorrSrc(alphaK,src,verbose=True,table=False)
         apCorrBoth_BB=calcApCorrSrc_BB(betaK,tempK,src,verbose=True,table=False)
