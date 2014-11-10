@@ -36,7 +36,7 @@ import SpireHandbookBundle as hb
 
 #-------------------------------------------------------------------------------
 #===============================================================================
-#=====                  SPECIFY CALIBRATION TREE (OPTIONAL                 =====
+#=====                  SPECIFY CALIBRATION TREE (OPTIONAL)                =====
 #===============================================================================
 #-------------------------------------------------------------------------------
 
@@ -54,7 +54,7 @@ import SpireHandbookBundle as hb
 ## 4) or read a calibration, make modifications, use that
 #cal_mod=spireCal()
 #<make modifications>
-#hp.getCal(cal=cal_mod)
+#hb.getCal(cal=cal_mod)
 
 ## The calibration is then used for all the processes in the module
 
