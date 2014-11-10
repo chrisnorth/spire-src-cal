@@ -67,6 +67,8 @@ import os
 import herschel
 from herschel.share.util import Configuration
 from herschel.ia.numeric import Double1d,Float1d,Int1d,String1d
+from herschel.spire.ia.cal import SpireCalTask
+spireCal = SpireCalTask()
 from herschel.ia.dataset import TableDataset,Column
 from herschel.ia.toolbox.util import AsciiTableWriterTask, SimpleFitsWriterTask
 from herschel.ia.toolbox.util import AsciiTableReaderTask, SimpleFitsReaderTask
@@ -116,6 +118,90 @@ def spireBands():
     """
     return(['PSW','PMW','PLW'])
 
+def getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
+    """
+    ========================================================================
+    getCal(cal=None,calTree=None,calPool=None,calFile=None,verbose=False):
+        Read photometer Calibration tree from appropriate input
+        Stored in global variable spireCalPhot so only read once
+
+    Inputs:
+        cal:     (SpireCal Context) calibration tree to extract photometer tree
+                 from. Default=None
+        calTree: (string) name of cal tree to read from HSA. Default=None
+        calPool: (string) name of pool to read cal tree from. Default=None
+        calFile: (string) filename to read cal tree from. Default=None
+        verbose: (boolean) Print extra information. Default=False
+    Outputs:
+        (PhotCal Context) reference frequencies in Hz (one per band)
+                    
+    Calculation:
+        If spireCalPhot already defined, check it is valid and return
+        If not, and no inputs defined, try to read from local pool
+        If that fails, try in the following order:
+            If cal set, extract PhotCalContext from there
+            If calTree set, read from HSA calibration tree
+            If calPool set, read from local pool
+            If calFile set, read from jar file
+        Check spireCalPhot is a valie PhotCalContext
+    
+    Dependencies:
+        herschel.spire.ia.cal.SpireCalTask
+    """
+    # if cal not defined, read from pool or jarFile
+    # if cal is defined, don't read anything new. Just check and return cal
+    #print cal,calTree,calPool,calFile,verbose
+    
+    #set global variables
+    global spireCalPhot #Photometer Calibration Context (spireCal.getPhot())
+
+    try:
+        spireCalPhot
+        #global variable already defined, so do nothing
+    except:
+        #get spireCalTree
+        if cal==None and calTree==None and calPool==None and calFile==None:
+            #no import provided. do default action
+            if (verbose):print 'Reading from default pool'
+            cal=spireCal()
+            if (verbose):print 'Calibration read from default pool: %s'%cal.meta["version"].value
+        try:
+            #try getting from cal
+            spireCalPhot=cal.getPhot()
+        except:
+            if cal==None and calTree!=None:
+                #try to read from HSA with calTree
+                cal=spireCal(calTree=calTree)
+                #try:
+                #    cal=spireCal(calTree=calTree)
+                #except:
+                #    if verbose: print 'unable to read from HSA'
+            if cal==None and calPool!=None:
+                #try to read from local pool
+                cal=spireCal(pool=calPool)
+                #try:
+                #    cal=spireCal(pool=calPool)
+                #except:
+                #    if verbose: print 'unable to read from local pool'
+            if cal==None and calFile!=None:
+                #try to read from jarFile
+                cal=spireCal(jarfile=calFile)
+                #try:
+                #    cal=spireCal(jarfile=calFile)
+                #except:
+                #    if verbose: print 'unable to read from jar file'
+            assert cal!=None,\
+                'ERROR: Unable to read calibration context'
+
+            spireCalPhot=cal.getPhot()
+        
+        assert spireCalPhot.isValid(),'ERROR: Invalid SPIRE Photometer calibration tree'
+    
+    #pass to module "sh" for use in those modules
+    sh.getCal(cal=cal)
+    
+    return(spireCalPhot)
+    
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                  CALCULATE MONOCHROMATIC BEAM AREAS                 =====

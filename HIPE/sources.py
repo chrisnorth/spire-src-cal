@@ -126,7 +126,9 @@ from herschel.ia.numeric.toolbox.interp import CubicSplineInterpolator,LinearInt
 #-------------------------------------------------------------------------------
 class Source(object):
     
-    def __init__(self,srcTypeIn,paramsIn=None,verbose=False):
+    def __init__(self,srcTypeIn=None,paramsIn=None,verbose=False):
+        if srcTypeIn==None:
+            srcTypeIn='NONE'
         #set available types
         self.initAvailableTypes()
         #set variables
@@ -257,6 +259,7 @@ class Source(object):
     
     def initAvailableTypes(self):
         self.availableTypes={}
+        self.availableTypes["NONE"]=NoneSourceType()
         self.availableTypes["GAUSSIAN"]=GaussianSourceType()
         self.availableTypes["EXPONENT"]=ExponentialSourceType()
         self.availableTypes['LINEAR']=LinearSourceType()
@@ -269,6 +272,8 @@ class Source(object):
         #list all source types
         print '====\nSource Types\n===='
         for typeName in self.availableTypes:
+            if typeName=='NONE':
+                continue
             print 'SourceType %s:'%(typeName)
             print str(self.availableTypes[typeName])
             print '-----'
