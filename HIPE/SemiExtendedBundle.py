@@ -92,7 +92,7 @@ MAX=herschel.ia.numeric.toolbox.basic.Max.FOLDR
 MIN=herschel.ia.numeric.toolbox.basic.Min.FOLDR
 
 import SpireHandbookBundle as sh
-import sources as src
+import sources as srcMod
 #scriptVersionString = "SemiExtendedBundle.py $Revision: 1.0 $"
     
 #-------------------------------------------------------------------------------
@@ -258,20 +258,20 @@ def calcBeamSrcMonoArea(src,verbose=False,forceRecalc=False):
 
     global beamMonoSrcArea
 
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src mus be either Source or SourceProfile object'
     #read in beamProfiles
     beamProfs = sh.getCal().getProduct("RadialCorrBeam")
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
 
-    if type(src)==src.Source:
+    if type(src)==srcMod.Source:
         #create source profile
         
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==src.SourceProfile:
+    elif type(src)==srcMod.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
 
@@ -555,7 +555,7 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     """
     
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     #make global variable
@@ -565,13 +565,13 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
     beamProfs=sh.getCal().getProduct('RadialCorrBeam')
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
         
-    if type(src)==src.Source:
+    if type(src)==srcMod.Source:
         #create source profile
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==src.SourceProfile:
+    elif type(src)==srcMod.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
         if verbose:print'Using SourceProfile %s'%(srcProf.key)
@@ -611,9 +611,9 @@ def calcEffBeamSrc(alphaK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=src.SourceProfile(beamRad,effBeam_x,key='EffBeam_alpha_%g_%s'%(alphaK,band))
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_alpha_%g_%s'%(alphaK,band))
             effBeamNormProfile=effBeamProfile.normArea()
-            srcConv[band]=src.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose,key='%s_%s'%(effBeamKey,band))
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,verbose=verbose,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
             
@@ -656,7 +656,7 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
     """
     
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     #make global variable
@@ -666,13 +666,13 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
     beamProfs=sh.getCal().getProduct('RadialCorrBeam')
     beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
         
-    if type(src)==src.Source:
+    if type(src)==srcMod.Source:
         #create source profile
         fromSrc=True
         srcProf=src.calcProfile(beamRad)
         if verbose:print'Creating SourceProfile %s from Source %s'%(srcProf.key,src.key)
         
-    elif type(src)==src.SourceProfile:
+    elif type(src)==srcMod.SourceProfile:
         fromSrc=False
         srcProf=src.copy()
         if verbose:print'Using SourceProfile %s'%(srcProf.key)
@@ -712,10 +712,10 @@ def calcEffBeamSrc_BB(betaK,tempK,src,verbose=False,forceRecalc=False):
         for band in spireBands():
             if verbose:print 'Computing %s effective beam for %s'%(effBeamKey,band)
             effBeam_x=effBeams[band]
-            effBeamProfile=src.SourceProfile(beamRad,effBeam_x,key='EffBeam_beta_%g_temp_%g_%s'%(betaK,tempK,band))            
+            effBeamProfile=srcMod.SourceProfile(beamRad,effBeam_x,key='EffBeam_beta_%g_temp_%g_%s'%(betaK,tempK,band))            
             effBeamNormProfile=effBeamProfile.normArea()
                         
-            srcConv[band]=src.convolveProfiles(srcProf,effBeamNormProfile,key='%s_%s'%(effBeamKey,band))
+            srcConv[band]=srcMod.convolveProfiles(srcProf,effBeamNormProfile,key='%s_%s'%(effBeamKey,band))
         if effBeamKey!=None:
             effBeamSrcProfs[effBeamKey]=srcConv
 
@@ -776,7 +776,7 @@ def calcKColPSrc(alphaK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4P=sh.calcK4P()
@@ -894,7 +894,7 @@ def calcKColPSrc_BB(betaK,tempK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4P=sh.calcK4P()
@@ -1009,7 +1009,7 @@ def calcKColESrc(alphaK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
       
     k4E_Tot=sh.calcKMonE()
@@ -1106,7 +1106,7 @@ def calcKColESrc_BB(betaK,tempK,src,verbose=False,table=False):
     #spireFilt=getSpireFilt(cal)
 
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
             
     k4E_Tot=sh.calcKMonE()
@@ -1197,7 +1197,7 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     """
     
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
     #read aperture from input
     assert type(aperture)==list,'aperture must be 3-element list'
@@ -1245,7 +1245,7 @@ def calcApCorrSrc(alphaK,src,aperture=[22., 30.,45.],annulus=[60.,90],verbose=Fa
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #calculate SourceProfile from src (if necessary)
-    if type(src)==src.Source:
+    if type(src)==srcMod.Source:
         srcProf=src.calcProfile(beamRad)
     else:
         if src.checkRadArr(beamRad):
@@ -1397,7 +1397,7 @@ def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],ve
     """
     
     #check type of src
-    assert type(src)==src.Source or type(src)==src.SourceProfile,\
+    assert type(src)==srcMod.Source or type(src)==srcMod.SourceProfile,\
       'src must be Source object or SourceProfile object'
     #read aperture from input
     assert type(aperture)==list,'aperture must be 3-element list'
@@ -1445,7 +1445,7 @@ def calcApCorrSrc_BB(betaK,tempK,src,aperture=[22., 30.,45.],annulus=[60.,90],ve
     integTot=TrapezoidalIntegrator(0.,maxRad)
 
     #calculate SourceProfile from src (if necessary)
-    if type(src)==src.Source:
+    if type(src)==srcMod.Source:
         srcProf=src.calcProfile(beamRad)
     else:
         if src.checkRadArr(beamRad):
@@ -1675,7 +1675,7 @@ def loadEffBeams(directory=None,verbose=False):
             effBeamSrcProfs[key]={'PSW':Double.NaN,'PMW':Double.NaN,'PLW':Double.NaN}
         for band in spireBands():
             table=simpleFitsReader(file=os.path.join(directory,fileList[band][n]))
-            effBeamSrcProfs[key][band]=src.SourceProfile().loadFits(directory=directory,filename=fileList[band][n],verbose=verbose)
+            effBeamSrcProfs[key][band]=srcMod.SourceProfile().loadFits(directory=directory,filename=fileList[band][n],verbose=verbose)
     if verbose:print 'effBeamSrcProfs read from files in %s'%directory
 
 #-------------------------------------------------------------------------------
@@ -1897,7 +1897,7 @@ def semiExtendedTest():
     KColP_partialPLW=[]
     
     for wid in srcWidths:
-        src=src.Source('Gaussian',[wid])
+        src=srcMod.Source('Gaussian',[wid])
         #calculate colour corrections from source
         KColP_partial=calcKColPSrc(alphaK,src,verbose=True,table=False)
         KColE_partial=calcKColESrc(alphaK,src,verbose=True,table=False)
@@ -1933,7 +1933,7 @@ def testApCorr():
     apCorrIncBG_partialPMW=[]
     apCorrIncBG_partialPLW=[]
     for wid in srcWidths:
-        src=src.Source('Gaussian',[wid])
+        src=srcMod.Source('Gaussian',[wid])
         
         apCorrBoth=calcApCorrSrc(alphaK,src,verbose=True,table=False)
         apCorrBoth_BB=calcApCorrSrc_BB(betaK,tempK,src,verbose=True,table=False)
