@@ -59,30 +59,30 @@ for band in bands:
 cols={'PSW':java.awt.Color.BLUE,'PMW':java.awt.Color.GREEN,'PLW':java.awt.Color.RED,\
  'PSW 2':java.awt.Color.ORANGE,'PMW 2':java.awt.Color.MAGENTA,'PLW 2':java.awt.Color.CYAN}
 pb=PlotXY()
-pb.setXtitle('alpha')
-pb.setYtitle('Beam Areas [arcsec^2]')
 for band in bands:
     pb.addLayer(LayerXY(alphaArr,beamAreas[band],color=cols[band]))
     pb.addLayer(LayerXY(alphaArr,beamAreasCal[band],color=cols[band+' 2'],line=Style.DASHED))
+pb.setXtitle('alpha')
+pb.setYtitle('Beam Areas [arcsec^2]')
 
 pbDiff=PlotXY()
-pbDiff.setXtitle('alpha')
-pbDiff.setYtitle('Beam Areas / Cal Tree 13.0')
 for band in bands:
     pbDiff.addLayer(LayerXY(alphaArr,beamAreas[band]/beamAreasCal[band],color=cols[band]))
+pbDiff.setXtitle('alpha')
+pbDiff.setYtitle('Beam Areas / Cal Tree 13.0')
 
 pk=PlotXY()
-pk.setXtitle('alpha')
-pk.setYtitle('Beam Correction Factor [K_beam]')
 for band in bands:
     pk.addLayer(LayerXY(alphaArr,kBeams[band],color=cols[band]))
     pk.addLayer(LayerXY(alphaArr,kBeamsCal[band],color=cols[band+' 2'],line=Style.DASHED))
+pk.setXtitle('alpha')
+pk.setYtitle('Beam Correction Factor [K_beam]')
 
 pkDiff=PlotXY()
-pk.setXtitle('alpha')
-pk.setYtitle('Beam Correction / Cal Tree 13.0')
 for band in bands:
     pkDiff.addLayer(LayerXY(alphaArr,kBeams[band]/kBeamsCal[band],color=cols[band]))
+pkDiff.setXtitle('alpha')
+pkDiff.setYtitle('Beam Correction / Cal Tree 13.0')
 
 ################################################################################
 ####                             Make Beam Maps                             ####
@@ -163,7 +163,7 @@ for band in bands:
     for a in range(nA):
         alpha=alphaArr[a]
         s=alphaKeys[a]
-        print 'calculating aperture correction for %s %s'%(s,band)
+        print 'calculating CalTree aperture correction for %s %s'%(s,band)
         ####
         apPhotReCal = annularSkyAperturePhotometry(image=beamMaps1arcsec[s][band], \
           fractional=0, centerX=nRad-1, centerY=nRad-1, \
@@ -178,6 +178,7 @@ for band in bands:
     for a in range(nA):
         alpha=alphaArr[a]
         s=alphaKeys[a]
+        print 'calculating CalTree aperture correction (frac=1)for %s %s'%(s,band)
         apPhotReCalFrac = annularSkyAperturePhotometry(image=beamMaps1arcsec[s][band], \
           fractional=1, centerX=nRad-1, centerY=nRad-1, \
           radiusArcsec=apPhotRad[band], \
@@ -190,6 +191,7 @@ for band in bands:
 for band in bands:
     for a in range(nA):
         alpha=alphaArr[a]
+        print 'calculating analytical aperture correction (frac=1)for %s %s'%(s,band)
         anaApCorr=hb.calcApCorr(alpha,aperture=apPhotRad[band],\
           annulus=[apPhotBGRad['in'],apPhotBGRad['out']],array=band,verbose=False)
         apCorr['AnaIncBG'][band].data[a]=anaApCorr[0]
@@ -200,20 +202,21 @@ for band in bands:
     for a in range(nA):
         alpha=alphaArr[a]
         s=alphaKeys[a]
-        print 'calculating aperture correction for %s %s'%(s,band)
+        print 'calculating nominal pixel aperture correction (frac=1)for %s %s'%(s,band)
         ####
-        apPhotReCal = annularSkyAperturePhotometry(image=beamMapsNominal[s][band], \
+        apPhotNomPix = annularSkyAperturePhotometry(image=beamMapsNominal[s][band], \
           fractional=0, centerX=pixCtrs[band], centerY=pixCtrs[band], \
           radiusArcsec=apPhotRad[band], \
           innerArcsec=apPhotBGRad['in'], outerArcsec=apPhotBGRad['out'])
-        apCorr['NomPixIncBG'][band].data[a]=beamAreas[band][a]/apPhotReCal.getTargetTotal()
-        apCorr['NomPixNoBG'][band].data[a]=beamAreas[band][a]/apPhotReCal.getTargetPlusSkyTotal()
+        apCorr['NomPixIncBG'][band].data[a]=beamAreas[band][a]/apPhotNomPix.getTargetTotal()
+        apCorr['NomPixNoBG'][band].data[a]=beamAreas[band][a]/apPhotNomPix.getTargetPlusSkyTotal()
         ####
 
 types={'Cal':{'col':java.awt.Color.BLACK,'desc':'CalTree (13.0)'},\
   'ReCal':{'col':java.awt.Color.BLUE,'desc':'Recalculated CalTree'},\
+  'ReCalFrac':{'col':java.awt.Color.CYAN,'desc':'Recalculated CalTree (Frac=1)'},\
   'Ana':{'col':java.awt.Color.RED,'desc':'Analytical'},\
-  'NomPix':{'col':java.awt.Color.GREEN,'desc':'Analytical'}}
+  'NomPix':{'col':java.awt.Color.GREEN,'desc':'Nominal Pixels'}}
 plots={}
 for band in bands:
     plots[band]=PlotXY()
@@ -245,8 +248,8 @@ for band in bands:
             spDone=True
     plots[band].setTitleText('%s ApCorr Factors'%band)
     plots[band].getLegend().setVisible(True)
-
-#
+    #
+    #
     for t in types:
         plots[pnNo].addLayer(LayerXY(alphaArr,apCorr[t+'NoBG'][band].data,color=types[t]['col'],name=types[t]['desc']))
     plots[pnNo].setXtitle('alpha')
