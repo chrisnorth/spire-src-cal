@@ -3,11 +3,13 @@
 #output is the min/max of (1 - ver1/ver2) for a range of parameters
 
 #set to also plot some plots
-doPlot=True
+doPlot=False
 
 #set version numbers (type = "file" or "cal")
-ver1={'name':"v4",'type':"file"}
+#ver1={'name':"v4EP",'type':"file"}
+ver1={'name':"spire_cal_12_2",'type':"cal"}
 ver2={'name':"spire_cal_12_3",'type':"cal"}
+#ver2={'name':"v4EP",'type':"file"}
 
 #set version numbers for specific files
 verBeamProf=[ver1,ver2]
@@ -25,10 +27,15 @@ spireBands=["PSW","PMW","PLW"]
 # RadialCorrBeam
 if verBeamProf[0]['type']=="file":
     beamProf1=fitsReader('%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_%s.fits'%(directory,verBeamProf[0]['name']))
+elif verBeamProf[0]['type']=="jar":
+    beamProf1=spireCal(jarFile=verBeamProf[0]['name']).getPhot().getRadialCorrBeam()
 else:
-    beamprof1=spireCal(verBeamProf[0]['name']).getPhot().getRadialCorrBeam()
+    beamProf1=spireCal(verBeamProf[0]['name']).getPhot().getRadialCorrBeam()
+ 
 if verBeamProf[1]['type']=='file':
     beamProf2=fitsReader('%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_%s.fits'%(directory,verBeamProf[1]['name']))
+elif verBeamProf[1]['type']=='jar':
+    beamProf2=spireCal(jarFile=verBeamProf[1]['name']).getPhot().getRadialCorrBeam()
 else:
     beamProf2=spireCal(verBeamProf[1]['name']).getPhot().getRadialCorrBeam()
 
@@ -49,10 +56,14 @@ for band in spireBands:
 # ColorCorrBeam
 if verKBeam[0]['type']=='file':
     Kbeam1=fitsReader('%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_%s.fits'%(directory,verKBeam[0]['name']))
+elif verKBeam[0]['type']=='jar':
+    Kbeam1=spireCal(jarFile=verKBeam[0]['name']).getPhot().getColorCorrBeam()
 else:
     Kbeam1=spireCal(verKBeam[0]['name']).getPhot().getColorCorrBeam()
 if verKBeam[1]['type']=='file':
     Kbeam2=fitsReader('%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_%s.fits'%(directory,verKBeam[1]['name']))
+elif verKBeam[1]['type']=='jar':
+    Kbeam2=spireCal(jarFile=verKBeam[1]['name']).getPhot().getColorCorrBeam()
 else:
     Kbeam2=spireCal(verKBeam[1]['name']).getPhot().getColorCorrBeam()
 
@@ -69,10 +80,14 @@ for band in spireBands:
 # ColorCorrK_point
 if verKPsrc[0]['type']=='file':
     KPsrc1=fitsReader('%s//Phot//SCalPhotColorCorrK//SCalPhotColorCorrK_point_%s.fits'%(directory,verKPsrc[0]['name']))
+elif verKPsrc[0]['type']=='jar':
+    KPsrc1=spireCal(jarFile=verKPsrc[0]['name']).getPhot().getColorCorrKList().getProduct('point')
 else:
     KPsrc1=spireCal(verKPsrc[0]['name']).getPhot().getColorCorrKList().getProduct('point')
 if verKPsrc[1]['type']=='file':
     KPsrc2=fitsReader('%s//Phot//SCalPhotColorCorrK//SCalPhotColorCorrK_point_%s.fits'%(directory,verKPsrc[1]['name']))
+elif verKPsrc[1]['type']=='jar':
+    KPsrc2=spireCal(jarFile=verKPsrc[1]['name']).getPhot().getColorCorrKList().getProduct('point')
 else:
     KPsrc2=spireCal(verKPsrc[1]['name']).getPhot().getColorCorrKList().getProduct('point')
 
@@ -89,10 +104,14 @@ for band in spireBands:
 # ColorCorrK_extended
 if verKExtd[0]['type']=='file':
     KExtd1=fitsReader('%s//Phot//SCalPhotColorCorrK//SCalPhotColorCorrK_extended_%s.fits'%(directory,verKExtd[0]['name']))
+elif verKExtd[0]['type']=='jar':
+    KExtd1=spireCal(jarFile=verKExtd[0]['name']).getPhot().getColorCorrKList().getProduct('extended')
 else:
     KExtd1=spireCal(verKExtd[0]['name']).getPhot().getColorCorrKList().getProduct('extended')
 if verKExtd[1]['type']=='file':
     KExtd2=fitsReader('%s//Phot//SCalPhotColorCorrK//SCalPhotColorCorrK_extended_%s.fits'%(directory,verKExtd[1]['name']))
+elif verKExtd[1]['type']=='jar':
+    KExtd2=spireCal(jarFile=verKExtd[1]['name']).getPhot().getColorCorrKList().getProduct('extended')
 else:
     KExtd2=spireCal(verKExtd[1]['name']).getPhot().getColorCorrKList().getProduct('extended')
 
@@ -109,10 +128,14 @@ for band in spireBands:
 # ColorCorrAperture_noBG
 if verApCorr[0]['type']=='file':
     apCorrNoBG1=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_noBG_%s.fits'%(directory,verApCorr[0]['name']))
+elif verApCorr[0]['type']=='jar':
+    apCorrNoBG1=spireCal(jarFile=verApCorr[0]['name']).getPhot().getColorCorrApertureList().getProduct('noBG')
 else:
     apCorrNoBG1=spireCal(verApCorr[0]['name']).getPhot().getColorCorrApertureList().getProduct('noBG')
 if verApCorr[1]['type']=='file':
     apCorrNoBG2=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_noBG_%s.fits'%(directory,verApCorr[1]['name']))
+elif verApCorr[1]['type']=='jar':
+    apCorrNoBG2=spireCal(jarFile=verApCorr[1]['name']).getPhot().getColorCorrApertureList().getProduct('noBG')
 else:
     apCorrNoBG2=spireCal(verApCorr[1]['name']).getPhot().getColorCorrApertureList().getProduct('noBG')
 
@@ -125,11 +148,15 @@ for band in spireBands:
 #-------------------------------------------------------------------------------
 # ColorCorrAperture_incBG
 if verApCorr[0]['type']=='file':
-    apCorrIncBG1=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_noBG_%s.fits'%(directory,verApCorr[0]['name']))
+    apCorrIncBG1=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_incBG_%s.fits'%(directory,verApCorr[0]['name']))
+elif verApCorr[0]['type']=='jar':
+    apCorrIncBG1=spireCal(jarFile=verApCorr[0]['name']).getPhot().getColorCorrApertureList().getProduct('incBG')
 else:
     apCorrIncBG1=spireCal(verApCorr[0]['name']).getPhot().getColorCorrApertureList().getProduct('incBG')
 if verApCorr[1]['type']=='file':
-    apCorrIncBG2=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_noBG_%s.fits'%(directory,verApCorr[1]['name']))
+    apCorrIncBG2=fitsReader('%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_incBG_%s.fits'%(directory,verApCorr[1]['name']))
+elif verApCorr[1]['type']=='jar':
+    apCorrIncBG2=spireCal(jarFile=verApCorr[1]['name']).getPhot().getColorCorrApertureList().getProduct('incBG')
 else:
     apCorrIncBG2=spireCal(verApCorr[1]['name']).getPhot().getColorCorrApertureList().getProduct('incBG')
 
@@ -143,10 +170,14 @@ for band in spireBands:
 # ColorCorrHfi
 if verKHfi[0]['type']=='file':
     KHfi1=fitsReader('%s//Phot//SCalPhotColorCorrHfi//SCalPhotColorCorrHfi_%s.fits'%(directory,verKHfi[0]['name']))
+elif verKHfi[0]['type']=='jar':
+    KHfi1=spireCal(jarFile=verKHfi[0]['name']).getPhot().getColorCorrHfi()
 else:
     KHfi1=spireCal(verKHfi[0]['name']).getPhot().getColorCorrHfi()
 if verKHfi[1]['type']=='file':
     KHfi2=fitsReader('%s//Phot//SCalPhotColorCorrHfi//SCalPhotColorCorrHfi_%s.fits'%(directory,verKHfi[1]['name']))
+elif verKHfi[1]['type']=='jar':
+    KHfi2=spireCal(jarFile=verKHfi[1]['name']).getPhot().getColorCorrHfi()
 else:
     KHfi2=spireCal(verKHfi[1]['name']).getPhot().getColorCorrHfi()
 
@@ -312,6 +343,30 @@ for band in spireBands:
 		(min(1.-KExtd2['beta_2_00'][band].data/KExtd1['beta_2_00'][band].data),\
 		max(1.-KExtd2['beta_2_00'][band].data/KExtd1['beta_2_00'][band].data)))
 
+pKApNoa=PlotXY()
+for band in spireBands:
+	pKApNoa.addLayer(LayerXY(apCorrNoBG2['alpha']['alpha'].data,\
+		1.-apCorrNoBG2['alpha'][band].data/apCorrNoBG1['alpha'][band].data, \
+		color=cols[band],name='%s'%(band)))
+	pKApNoa.setTitleText('Aperture Correction (no BG)')
+	pKApNoa.yaxis.titleText = '1-%s/%s'%(verApCorr[1]['name'],verApCorr[0]['name'])
+	pKApNoa.xaxis.titleText = 'Spectral index'
+	pKApNoa.setSubtitleText('MIN=%.5g MAX=%.5g'%\
+		(min(1.-apCorrNoBG2['alpha'][band].data/apCorrNoBG1['alpha'][band].data),\
+		max(1.-apCorrNoBG2['alpha'][band].data/apCorrNoBG1['alpha'][band].data)))
+
+pKApInca=PlotXY()
+for band in spireBands:
+	pKApInca.addLayer(LayerXY(apCorrIncBG2['alpha']['alpha'].data,\
+		1.-apCorrIncBG2['alpha'][band].data/apCorrIncBG1['alpha'][band].data, \
+		color=cols[band],name='%s'%(band)))
+	pKApInca.setTitleText('Aperture Correction (inc BG)')
+	pKApInca.yaxis.titleText = '1-%s/%s'%(verApCorr[1]['name'],verApCorr[0]['name'])
+	pKApInca.xaxis.titleText = 'Spectral index'
+	pKApInca.setSubtitleText('MIN=%.5g MAX=%.5g'%\
+		(min(1.-apCorrIncBG2['alpha'][band].data/apCorrIncBG1['alpha'][band].data),\
+		max(1.-apCorrIncBG2['alpha'][band].data/apCorrIncBG1['alpha'][band].data)))
+		
 pKHFIr=PlotXY()
 for band in spireBands:
 	pKHFIr.addLayer(LayerXY(KHfi2i['colorCorr']['Temperature'].data,\

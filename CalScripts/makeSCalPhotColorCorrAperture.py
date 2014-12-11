@@ -129,7 +129,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -143,8 +143,8 @@ verbose = True
 apPhotRad={"PSW":22.,"PMW":30.,"PLW":45.}
 apPhotBGRad={'in':60.,'out':90.}
 # range of alphas to compute colour corrections for
-alphaK=[-4.,-3.5,-3.,-2.5,-2.,-1.5,-1.,-0.5,0.,0.5,1.,1.5,2.,2.5,3.,3.5,4.,4.5,5.]
-#alphaK=[-4,-1,2]
+#alphaK=[-4.,-3.5,-3.,-2.5,-2.,-1.5,-1.,-0.5,0.,0.5,1.,1.5,2.,2.5,3.,3.5,4.,4.5,5.]
+alphaK=[-4,-1,2]
 
 # range of beta and temp to calculate colour corrections for
 #betaK=[0.,0.5,1.,1.25,1.5,1.75,2.,2.5,3.]

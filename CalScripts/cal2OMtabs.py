@@ -1,6 +1,13 @@
 #turns cal tables into tex tables for OM
 
-cal=spireCal(pool='spire_cal_12_2')
+#cal=spireCal(pool='spire_cal_12_2')
+urlHaio ='http://archives.esac.esa.int/hsaint/aio/jsp/'
+archive = HsaReadPool(urlHaio+'metadata.jsp',urlHaio+'product.jsp')
+hsaRead = ProductStorage()
+hsaRead.register(archive)
+lookup = IdLookup ("spire_cal")
+cal = SpireCal.getInstance (hsaRead, lookup) # This should be version spire_cal_13_1
+#cal=spireCal(jarFile='/home/chris/hcss/workspace/spire_cal_13_0_photTest2.jar')
 spireBands=['PSW','PMW','PLW']
 from herschel.ia.numeric.toolbox.util.MoreMath import modulo
 
@@ -23,20 +30,20 @@ freqEff = {'PSW':cal.getPhot().getProduct("RadialCorrBeam").meta['freqEffPsw'].d
 kBeam = cal.getPhot().getProduct("ColorCorrBeam")
 
 ##get pipeline beam areas
-pipBeamArc = {'PSW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPswArc'].double, \
-	'PMW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPmwArc'].double, \
-	'PLW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPlwArc'].double}
+pipBeamArc = {'PSW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePswArc'].double, \
+	'PMW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePmwArc'].double, \
+	'PLW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePlwArc'].double}
 
-pipBeamSr = {'PSW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPswSr'].double, \
-	'PMW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPmwSr'].double, \
-	'PLW':cal.getPhot().getProduct("ColorCorrBeam").meta['beamPlwSr'].double}
+pipBeamSr = {'PSW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePswSr'].double, \
+	'PMW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePmwSr'].double, \
+	'PLW':cal.getPhot().getProduct("RadialCorrBeam").meta['beamPipelinePlwSr'].double}
 
 #calculate effective beam areas
 effBeamArc = kBeam.copy()
 for n in kBeam.getSets():
-	print n
+	#print n
 	for band in spireBands:
-		print band
+		#print band
 		effBeamArc[n][band].data = pipBeamArc[band]/kBeam[n][band].data
 
 #-------------------------------------------------------------------------------
@@ -67,6 +74,28 @@ apCorr_incBG = cal.getPhot().getProduct('ColorCorrApertureList')[0]
 apCorr_noBG = cal.getPhot().getProduct('ColorCorrApertureList')[1]
 
 ################################################################################
+## Print relevant DRG tables
+################################################################################
+print '\n----- Table 6.9 (Spire pipeline conversions factors for point and extended sources):'
+print '\\begin{tabular}{l|ccc}'
+print '\\hline\\hline'
+print 'Parameter & PSW & PMW & PLW\\\\'
+print '\hline'
+print 'K4P & %.4f & %.4f & %.4f \\\\'%\
+	(k4P['PSW'],k4P['PMW'],k4P['PLW'])
+print 'KMonE & %.4f & %.4f & %.4f \\\\'%\
+	(kMonE['PSW'],kMonE['PMW'],kMonE['PLW'])
+print 'KPtoE & %.4f & %.4f & %.4f \\\\'%\
+	(kPtoE['PSW'],kPtoE['PMW'],kPtoE['PLW'])
+print 'Beam area (arcsec$^2$, $\\alpha=-1$) & %.4f & %.4f & %.4f \\\\'%\
+	(pipBeamArc['PSW'],pipBeamArc['PMW'],pipBeamArc['PLW'])
+print 'K4E & %.4f & %.4f & %.4f \\\\'%\
+	(k4E['PSW'],k4E['PMW'],k4E['PLW'])
+print 'K4E/K4P (K4EdivK4P) & %.4f & %.4f & %.4f \\\\'%\
+	(k4E4P['PSW'],k4E4P['PMW'],k4E4P['PLW'])
+print '\\end{tabular}'
+
+################################################################################
 ## Print relevant OM tables
 ################################################################################
 
@@ -79,7 +108,7 @@ print '$\\alpha_\\mathrm{Nep}$ & %.2f & %.2f & %.2f \\\\'%(alphaNep['PSW'],alpha
 print 'Major$\\times$Minor\\- FWHM (arcsec) & 18.3$\\times$17.0 & 24.7$\\times$23.2 & 37.0$\\times$33.4 \\\\'
 print 'Geometric mean FWHM ($\\theta_\\mathrm{Nep}$, arcsec) & 17.6 & 23.9 & 35.2 \\\\'
 print 'Ellip\\-ticity (\\%%)& 8.1 & 6.6 & 10.9 \\\\'
-print 'Measured beam solid angle ($\\Omega_\\mathrm{Nep}$, arcsec$^2$) & 450 & 795 & 1665 \\\\'
+#print 'Measured beam solid angle ($\\Omega_\\mathrm{Nep}$, arcsec$^2$) & 450 & 795 & 1665 \\\\'
 print 'Measured beam solid angle ($\\Omega_\\mathrm{Nep}$, arcsec$^2$) & %.0f & %.0f & %.0f \\\\'%\
 	(beamNepArc['PSW'],beamNepArc['PMW'],beamNepArc['PLW'])
 print 'Isophotal frequency$^a$ ($\\nu_\\mathrm{eff}$, GHz) & %.2f & %.2f & %.2f'%\
