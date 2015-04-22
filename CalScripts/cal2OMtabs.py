@@ -1,15 +1,29 @@
 #turns cal tables into tex tables for OM
 
 #cal=spireCal(pool='spire_cal_12_2')
-urlHaio ='http://archives.esac.esa.int/hsaint/aio/jsp/'
-archive = HsaReadPool(urlHaio+'metadata.jsp',urlHaio+'product.jsp')
-hsaRead = ProductStorage()
-hsaRead.register(archive)
-lookup = IdLookup ("spire_cal")
-cal = SpireCal.getInstance (hsaRead, lookup) # This should be version spire_cal_13_1
+#urlHaio ='http://archives.esac.esa.int/hsaint/aio/jsp/'
+#archive = HsaReadPool(urlHaio+'metadata.jsp',urlHaio+'product.jsp')
+#hsaRead = ProductStorage()
+#hsaRead.register(archive)
+#lookup = IdLookup ("spire_cal")
+#cal = SpireCal.getInstance (hsaRead, lookup) # This should be version spire_cal_13_1
 #cal=spireCal(jarFile='/home/chris/hcss/workspace/spire_cal_13_0_photTest2.jar')
-spireBands=['PSW','PMW','PLW']
+
 from herschel.ia.numeric.toolbox.util.MoreMath import modulo
+from herschel.share.unit import *
+c = Constant.SPEED_OF_LIGHT.value
+
+##Read calibration tree
+cal = spireCal(pool='spire_cal_13_1')
+
+#set up bands
+spireBands=['PSW','PMW','PLW']
+
+#set up wavelengths & frequencies
+wl0_um={'PSW':250.0,'PMW':350.,'PLW':500.}
+nu0_GHz={}
+for band in spireBands:
+    nu0_GHz[band] = 1.e-9 * c / (wl0_um[band] * 1.e-6)
 
 #-------------------------------------------------------------------------------
 ##get Neptune beam areas
@@ -76,7 +90,7 @@ apCorr_noBG = cal.getPhot().getProduct('ColorCorrApertureList')[1]
 ################################################################################
 ## Print relevant DRG tables
 ################################################################################
-print '\n----- Table 6.9 (Spire pipeline conversions factors for point and extended sources):'
+print '\n----- DRG Table 6.9 (Spire pipeline conversions factors for point and extended sources):'
 print '\\begin{tabular}{l|ccc}'
 print '\\hline\\hline'
 print 'Parameter & PSW & PMW & PLW\\\\'
@@ -99,7 +113,28 @@ print '\\end{tabular}'
 ## Print relevant OM tables
 ################################################################################
 
-print '\n----- Table 5.2 (Basic 2-D Gaussian parameters), last 2 rows:'
+
+#-------------------------------------------------------------------------------
+
+print '\n----- Table 5.1 (K4 parameters etc.):'
+print '\\begin{tabular}{l|ccc}'
+print '\\hline\\hline'
+print 'Band & PSW & PMW & PLW \\\\'
+print '\\hline'
+print 'Reference wavelength, $\\lambda_0$ ($\mu$m) & %.1f & %.1f & %.1f \\\\'%(wl0_um['PSW'],wl0_um['PMW'],wl0_um['PLW'])
+print 'Reference frequency, $\\nu_0$ (GHz) & %.2f & %.2f & %.2f \\\\'%(nu0_GHz['PSW'],nu0_GHz['PMW'],nu0_GHz['PLW'])
+print '$K_\\mathrm{4P}$ & %.4f & %.4f & %.4f \\\\'%(k4P['PSW'],k4P['PMW'],k4P['PLW'])
+print '$K_\\mathrm{MonE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kMonE['PSW'],kMonE['PMW'],kMonE['PLW'])
+print '$K_\\mathrm{PtoE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kPtoE['PSW'],kPtoE['PMW'],kPtoE['PLW'])
+print '$\\Omega_\\mathrm{pip}$ (arcsec$^2$) & %.2f & %.2f & %.2f \\\\'%(pipBeamArc['PSW'],pipBeamArc['PMW'],pipBeamArc['PLW'])
+print '\\hline'
+print '$K_\\mathrm{4E}$ & %.4f & %.4f & %.4f \\\\'%(k4E['PSW'],k4E['PMW'],k4E['PLW'])
+print '$K_\\mathrm{4E}/K_\\mathrm{4P}$ & %.4f & %.4f & %.4f '%(k4E4P['PSW'],k4E4P['PMW'],k4E4P['PLW'])
+print '\\end{tabular}'
+
+#-------------------------------------------------------------------------------
+
+print '\n----- Table 5.2 (Basic 2-D Gaussian parameters), all but last 2 rows hard-coded:'
 print '\\begin{tabular}{l|ccc}'
 print '\\hline\\hline'
 print 'Band & PSW & PMW & PLW\\\\'
@@ -227,22 +262,7 @@ print '\\hline'
 print '\\end{tabular}'
 
 #-------------------------------------------------------------------------------
-print '\n----- Table 5.7 (k4 parameters etc.):'
-print '\\begin{tabular}{l|ccc}'
-print '\\hline\\hline'
-print '& PSW & PMW & PLW \\\\'
-print '\\hline'
-print '$K_\\mathrm{4P}$ & %.4f & %.4f & %.4f \\\\'%(k4P['PSW'],k4P['PMW'],k4P['PLW'])
-print '$K_\\mathrm{MonE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kMonE['PSW'],kMonE['PMW'],kMonE['PLW'])
-print '$K_\\mathrm{PtoE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kPtoE['PSW'],kPtoE['PMW'],kPtoE['PLW'])
-print '$\\Omega_\\mathrm{pip}$ (arcsec$^2$) & %.2f & %.2f & %.2f \\\\'%(pipBeamArc['PSW'],pipBeamArc['PMW'],pipBeamArc['PLW'])
-print '\\hline'
-print '$K_\\mathrm{4E}$ & %.4f & %.4f & %.4f \\\\'%(k4E['PSW'],k4E['PMW'],k4E['PLW'])
-print '$K_\\mathrm{4E}/K_\\mathrm{4P}$ & %.4f & %.4f & %.4f '%(k4E4P['PSW'],k4E4P['PMW'],k4E4P['PLW'])
-print '\\end{tabular}'
-
-#-------------------------------------------------------------------------------
-print '\n----- Table 5.8 (Aperture correction):'
+print '\n----- Table 5.7 (Aperture correction):'
 print'\\begin{tabular}{r|ccc|ccc}'
 print '\\hline\\hline'
 print '& \\multicolumn{3}{c|}{Background included} & \\multicolumn{3}{c}{No Background} \\\\'
