@@ -82,7 +82,7 @@
 #   * hpXcalKcorr: Calculate K-correction parameters for given spectrum
 #
 #===============================================================================
-# $Id: makeSCalPhotColorCorrK.py,v 1.9 2014/02/26 18:42:48 epoleham Exp $
+# $Id: makeSCalPhotColorCorrK.py,v 1.10 2014/11/14 16:05:17 epoleham Exp $
 # 
 #  Edition History
 #   E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
@@ -91,10 +91,12 @@
 #   Chris North      18-02-2014  - updated to use full calculation instead of reading csv files
 #   Chris North      04-11-2014  - updated to use new beams (no constant part)
 #                                  removed constant from calculations where appropriate
+#  E. Polehampton    10-11-2014  - Tidy up metadata
 #
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrK.py $Revision: 1.9 $"
+scriptVersionString = "makeSCalPhotColorCorrK.py $Revision: 1.10 $"
+metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -135,7 +137,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4"
+version = "4EP"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -187,7 +189,7 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "2"
+	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal tree
 	apertureEfficiencyVersion = "1"
@@ -236,12 +238,12 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
-kBeamVersion = "4"
+kBeamVersion = "4EP"
 kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "4"
+beamProfsVersion = "4EP"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -382,12 +384,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
 	#isConst=beamNew.where(beamNew < beamConst)
 	#beamNew[isConst]=beamConst[isConst]
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -447,10 +449,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#get constant beam profile from calibration table
 	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -672,12 +674,12 @@ for band in spireBands:
 k4P = {}
 k4E_Tot = {}
 k4E = {}
-beamAreaPipSr  = {'PSW':beamProfs.meta['beamPipelinePswSr'],\
-	'PMW':beamProfs.meta['beamPipelinePmwSr'],\
-	'PLW':beamProfs.meta['beamPipelinePlwSr']}
-beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'],\
-	'PMW':beamProfs.meta['beamPipelinePmwArc'],\
-	'PLW':beamProfs.meta['beamPipelinePlwArc']}
+beamAreaPipSr  = {'PSW':beamProfs.meta['beamPipelinePswSr'].value,\
+	'PMW':beamProfs.meta['beamPipelinePmwSr'].value,\
+	'PLW':beamProfs.meta['beamPipelinePlwSr'].value}
+beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'].value,\
+	'PMW':beamProfs.meta['beamPipelinePmwArc'].value,\
+	'PLW':beamProfs.meta['beamPipelinePlwArc'].value}
 #create dictionaries for filenames
 
 #-----------------------------------------------------------------------
@@ -687,12 +689,12 @@ beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'],\
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 # Calculate pipeline colour correction parameters
-print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
+#print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
 for band in spireBands:
 	#pipeline beam areas
-	beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
-	  beamMonoArea[band], BB=False, alpha=-1)
-	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
+	#beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
+	#  beamMonoArea[band], BB=False, alpha=-1)
+	#beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 	#pipeline point source K4P conversion
 	k4P[band] = hpXcalKcorr(spireRefFreq[band], freq, spireFilt[band], \
 	  BB=False, ext=False)[0]
@@ -700,6 +702,19 @@ for band in spireBands:
 	k4E_Tot[band] = hpXcalKcorr(spireRefFreq[band], freq, spireFilt[band],
 	  BB=False, ext=True, monoArea=beamMonoArea[band])[0]
 	k4E[band] = k4E_Tot[band] * beamAreaPipSr[band]
+
+# These K4P and K4E parameters need to be added to the FluxConv and HFI 
+# products. But they are calculated here.
+# Therefore write out a text file that will be read in when writing the 
+# FluxConv product (the HFI product reads them from the FluxConv product)
+print "Extended K4 parameters = %s"%k4E
+print "Point source K4 parameters = %s"%k4P
+file = open("%s/colourCorrectionK4Parameters.txt"%(dataDir),"w")
+file.write("Generated by makeSCalPhotColorCorrK.py v%s %s\n"%(version,FineTime(java.util.Date())))
+file.write("   PSW   PMW   PLW\n")
+file.write("K4E   %s  %s  %s\n"%(k4E["PSW"], k4E["PMW"], k4E["PLW"]))
+file.write("K4P   %s  %s  %s"%(k4P["PSW"], k4P["PMW"], k4P["PLW"]))
+file.close()
 
 #-----------------------------------------------------------------------
 #=======================================================================
@@ -720,10 +735,10 @@ kCorrPsrc.meta["modelName"].value = "FM"
 kCorrPsrc.meta["creationDate"].value = FineTime(java.util.Date())
 kCorrPsrc.meta["startDate"].value = FineTime(startDate)
 kCorrPsrc.meta["endDate"].value   = FineTime(endDate)
-kCorrPsrc.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
-kCorrPsrc.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="v3.0", description="Origin of the data")
+kCorrPsrc.meta["author"]  = metaDict.newParameter("author", "Chris North")
+kCorrPsrc.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "ApertureEfficiency v%s; RSRF v%s; RadialBeamProf v%s; ColorCorrBeam v%s"%(apertureEfficiencyVersion, rsrfVersion, beamProfsVersion, kBeamVersion))
 kCorrPsrc.meta["dependency"].value = "correctionSourceType"
-kCorrPsrc.meta["correctionSourceType"] = StringParameter(value="point", description="")
+kCorrPsrc.meta["correctionSourceType"] = StringParameter(value="point", description="Type of colour correction (point or extended)")
 kCorrPsrc.setVersion(version)
 kCorrPsrc.setFormatVersion(formatVersion)
 
@@ -794,10 +809,10 @@ kCorrExtd.meta["modelName"].value = "FM"
 kCorrExtd.meta["creationDate"].value = FineTime(java.util.Date())
 kCorrExtd.meta["startDate"].value = FineTime(startDate)
 kCorrExtd.meta["endDate"].value   = FineTime(endDate)
-kCorrExtd.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
-kCorrExtd.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="v3.0", description="Origin of the data")
+kCorrPsrc.meta["author"]  = metaDict.newParameter("author", "Chris North")
+kCorrPsrc.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "ApertureEfficiency v%s; RSRF v%s; RadialBeamProf v%s; ColorCorrBeam v%s"%(apertureEfficiencyVersion, rsrfVersion, beamProfsVersion, kBeamVersion))
 kCorrExtd.meta["dependency"].value = "correctionSourceType"
-kCorrExtd.meta["correctionSourceType"] = StringParameter(value="extended", description="")
+kCorrExtd.meta["correctionSourceType"] = StringParameter(value="extended", description="Type of colour correction (point or extended)")
 kCorrExtd.setVersion(version)
 kCorrExtd.setFormatVersion(formatVersion)
 
@@ -884,9 +899,9 @@ kCorrExtd.meta['fileName'] = herschel.ia.dataset.StringParameter(value=kCorrExtd
 #-----------------------------------------------------------------------
 # write to FITS files
 fitsWriter = FitsArchive()
-fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.rules.append(metaDict.getInstance().getFitsDictionary())
 fitsWriter.save(kCorrPsrcFits.toString(), kCorrPsrc)
 
 fitsWriter = FitsArchive()
-fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.rules.append(metaDict.getInstance().getFitsDictionary())
 fitsWriter.save(kCorrExtdFits.toString(), kCorrExtd)

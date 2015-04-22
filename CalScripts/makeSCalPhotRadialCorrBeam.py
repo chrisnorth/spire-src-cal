@@ -64,27 +64,29 @@
 #   * spireFindEffFreq: Calculate the effective frequency for SPIRE
 #
 #===============================================================================
-# $Id: makeSCalPhotRadialCorrBeam.py,v 1.5 2014/02/27 10:59:41 epoleham Exp $
+# $Id: makeSCalPhotRadialCorrBeam.py,v 1.7 2014/11/14 16:33:28 epoleham Exp $
 #
 # 
-#  Edition History
-#   E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
-#   E. Polehampton   01-11-2013  - Add effective frequencies to metadata
-#   E. Polehampton   21-01-2014  - Add gamma as metadata, and beam areas - SPCAL-95, 96
-#   E. Polehampton   22-01-2014  - update tables - SPCAL-90
-#  Chris North   - 18/Feb/2014 - 1.0: First version (full calculation)
+# Edition History
+# E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
+# E. Polehampton   01-11-2013  - Add effective frequencies to metadata
+# E. Polehampton   21-01-2014  - Add gamma as metadata, and beam areas - SPCAL-95, 96
+# E. Polehampton   22-01-2014  - update tables - SPCAL-90
+# Chris North      18-02-2014  - 1.0: First version (full calculation)
 #                                     Used for spire_cal_12_1
-#  Chris North   - 26/Feb/2014 - 1.1: Added writing of ascii tables and log file
+# Chris North      26-02-2014  - 1.1: Added writing of ascii tables and log file
 #                                   SPCAL-109  
-#  Chris North   - 04-11-2014  - 2.0: Used new beams (no constant section)
+# Chris North      04-11-2014  - 2.0: SPCAL-126 Used new beams (no constant section)
 #                                     Changed Neptune beam areas to B. Schulz values
 #                                     "constant" table filled with zeros
 #                                     removed constant beam from calculations where appropriate
+# E. Polehampton   13-11-2014  - Tidy up metadata (use metadata dictionary)
 #===============================================================================
 
 import os
 from herschel.share.unit import *
-scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 2.0 $"
+scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.7 $"
+metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -125,13 +127,16 @@ writeLog = False
 #===============================================================================
 #-------------------------------------------------------------------------------
 # version number
-version = "4"
+version = "4EP"
 
 #read in core beam
 beamCoreIn = TableDataset()
 beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
+beamProfInFileNames = ""
 for band in ['PSW','PMW','PLW']:
-    beamProfIn=asciiTableReader(os.path.join(dataDir,'%s_MCore_9.csv'%band))['c0'].data
+    beamProfInFileName = '%s_MCore_9.csv'%band
+    beamProfInFileNames+", "+beamProfInFileName
+    beamProfIn=asciiTableReader(os.path.join(dataDir, beamProfInFileName))['c0'].data
     #set central pixel to 1
     beamProfIn[0]=1.0
     beamCoreIn.addColumn(band,Column(beamProfIn))
@@ -156,7 +161,9 @@ verbose = True
 # beam parameters
 arcsec2Sr = (Math.PI/(60.*60.*180))**2
 # area measured on Neptune
+# Taken from Bernhard's presentation at the SDAG on 30 October 2014.
 spireAreaEffFreq = {"PSW":454.0*arcsec2Sr, "PMW":803.4*arcsec2Sr, "PLW":1687.0*arcsec2Sr}
+spireAreaEffFreqErr = {"PSW":1.0*arcsec2Sr, "PMW":4.0*arcsec2Sr, "PLW":12.0*arcsec2Sr}
 # Neptune spectral index (from ESA4 model)
 alphaNep={"PSW":1.29, "PMW":1.42, "PLW":1.47}
 
@@ -192,7 +199,7 @@ spireBands=["PSW","PMW","PLW"]
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal tree
-	rsrfVersion = "2"
+	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -266,7 +273,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
 	  
 	2013/12/19  C. North  initial version
-	2014/11/07  C. North  removed beamConst (depracated) from calculations
+	2014/11/07  C. North  removed beamConst (deprecated) from calculations
 
 	"""
 
@@ -281,12 +288,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
 	
-	####  DEPREACATED  ####
+	####  DEPRECATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
 	#isConst=beamNew.where(beamNew < beamConst)
 	#beamNew[isConst]=beamConst[isConst]
-	####  /DEPREACATED  ####
+	####  /DEPRECATED  ####
 	
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -330,7 +337,7 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 	  herschel.ia.numeric.toolbox.interp.CubicSplineInterpolator
 	  
 	2013/12/19  C. North  initial version
-	2014/11/07  C. North  removed beamConst (depracated) from calculations
+	2014/11/07  C. North  removed beamConst (deprecated) from calculations
 
 	"""
 
@@ -347,10 +354,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#get constant beam profile from calibration table
 	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 	
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -435,7 +442,7 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 # Calculate the effective frequency for SPIRE
 def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
   areaNep, alphaNep, array, simpleBeam=False, freqFact=500,
-  initRange=0.01, reqPrec=1.e-6, maxIter=5, verbose=False):
+  initRange=0.001, reqPrec=1.e-6, maxIter=5, verbose=False):
 	"""
 	========================================================================
 	Derive effective frequency for spire bands. This is the frequency at
@@ -489,9 +496,11 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 	#parameterised be offset from original estimate
 	relEff=Double1d([1.-initRange,1.+initRange])
 	effFreqs=effFreqInit*relEff
-	if verbose:
-		print 'Calculating effective frequency for %s'%array
-		print '  Initial %s Effective Frequencies: [%.2f : %.2f] GHz'%(array,effFreqs[0]/1.e9,effFreqs[1]/1.e9)
+	beamMonoAreaInit=spireMonoAreas(freq,beamProfs,effFreqInit,gamma,array,freqFact=freqFact)
+	effAreaInit=spireEffArea(freq,rsrf, beamMonoAreaInit, BB=False, alpha=alphaNep)
+	arcsec2Sr = (Math.PI/(60.*60.*180))**2
+	print '  Initial %s Effective Frequency: %.2f GHz'%(array,effFreqInit/1.e9)
+	print '  Initial %s Effective Area: %.2f arcsec^2'%(array,effAreaInit/arcsec2Sr)
 	#calculate effective beam area for initial estimates of effFreq
 	if simpleBeam:
 		beamMonoArea0=spireMonoAreasSimple(freq,effFreqs[0],areaNep,gamma)
@@ -503,7 +512,10 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 	effAreas=Double1d(2)
 	effAreas[0]=spireEffArea(freq,rsrf, beamMonoArea0, BB=False, alpha=alphaNep)
 	effAreas[1]=spireEffArea(freq,rsrf, beamMonoArea1, BB=False, alpha=alphaNep)
-
+	if verbose:
+		print 'Calculating effective frequency for %s'%array
+		print '  Initial %s Effective Frequencies: [%.2f : %.2f] GHz'%(array,effFreqs[0]/1.e9,effFreqs[1]/1.e9)
+		print '  Initial %s Effective Areas: [%.2f : %.2f] arcsec^2'%(array,effAreas[0]/arcsec2Sr,effAreas[1]/arcsec2Sr)
 	iter=0
 	done=False
 	while ((done==False) and (iter <= maxIter)):
@@ -571,18 +583,16 @@ beamProfs.meta["startDate"].value = FineTime(startDate)
 beamProfs.meta["endDate"].value = FineTime(endDate)
 beamProfs.setVersion(version)
 beamProfs.setFormatVersion(formatVersion)
-beamProfsFileList='%s,%s'%(beamNewFileConstant,beamNewFileCore)
-beamProfs.meta['fileOrigin'] = StringParameter(beamProfsFileList,description="Origin of the data")
-beamProfs.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
+beamProfs.meta['dataOrigin'] = metaDict.newParameter('dataOrigin', "%s; RSRF v%s"%(beamProfInFileNames[2:],rsrfVersion))
+beamProfs.meta["author"]  = metaDict.newParameter("author", "Chris North")
 
 #read in beams from file
 beamProfs["constant"] = beamConstantIn
 beamProfs["core"] = beamCoreIn
 #update labels
-beamProfs["constant"].setDescription("[DEPRACATED, set to zero] Frequency-independent constant part of the radial beam profile")
+beamProfs["constant"].setDescription("[DEPRECATED, set to zero] Frequency-independent constant part of the radial beam profile")
 beamProfs["core"].setDescription("Frequency-dependent core part of the radial beam profile")
 
-#generate file list (for metadata
 
 # Re-compute normalised beam areas for new beams
 # get beam radius
@@ -601,14 +611,14 @@ for band in spireBands:
 	beamNormArea.addColumn(band,Column(Float1d(nRad)))
 	# get core beam
 	beamComb=beamProfs.getCoreCorrectionTable().getColumn(band).data.copy()
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	# get const beam
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(band).data
 	# work out where constant beam applies
 	#isConst = beamComb.where(beamComb < beamConst)
 	# apply constant beam where applicable
 	#beamComb[isConst] = beamConst[isConst]
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 	# interpolate and integrate
 	beamInterp=CubicSplineInterpolator(Double1d(beamRad),beamComb*2.*Math.PI*beamRad)
 	integrator=TrapezoidalIntegrator(0,max(beamRad))
@@ -622,28 +632,23 @@ beamProfs["normArea"]=beamNormArea
 #-------------------------------------------------------------------------------
 # Add metadata
 # add gamma to metadata
-beamProfs.meta['gamma']=DoubleParameter(gamma,description='Exponent describing FWHM dependence on frequency')
+beamProfs.meta['gamma'] = metaDict.newParameter('gamma', gamma)
 # add Neptune beam area to metaData (square arseconds)
-beamProfs.meta['beamNeptunePswArc']= DoubleParameter(spireAreaEffFreq['PSW']/arcsec2Sr, \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PSW beam area as measured on Neptune')
-beamProfs.meta['beamNeptunePmwArc']= DoubleParameter(spireAreaEffFreq['PMW']/arcsec2Sr, \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PMW beam area as measured on Neptune')
-beamProfs.meta['beamNeptunePlwArc']= DoubleParameter(spireAreaEffFreq['PLW']/arcsec2Sr, \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PLW beam area as measured on Neptune')
+beamProfs.meta['beamNeptunePswArc']= metaDict.newParameter('beamNeptunePswArc', spireAreaEffFreq['PSW']/arcsec2Sr)
+beamProfs.meta['beamNeptunePmwArc']= metaDict.newParameter('beamNeptunePmwArc', spireAreaEffFreq['PMW']/arcsec2Sr)
+beamProfs.meta['beamNeptunePlwArc']= metaDict.newParameter('beamNeptunePlwArc', spireAreaEffFreq['PLW']/arcsec2Sr)
+# add Neptune beam area error to metaData (square arseconds)
+beamProfs.meta['beamNeptunePswArcErr']= metaDict.newParameter('beamNeptunePswArcErr', spireAreaEffFreqErr['PSW']/arcsec2Sr)
+beamProfs.meta['beamNeptunePmwArcErr']= metaDict.newParameter('beamNeptunePmwArcErr', spireAreaEffFreqErr['PMW']/arcsec2Sr)
+beamProfs.meta['beamNeptunePlwArcErr']= metaDict.newParameter('beamNeptunePlwArcErr', spireAreaEffFreqErr['PLW']/arcsec2Sr)
 # add Neptune beam area to metaData (steradians)
-beamProfs.meta['beamNeptunePswSr']= DoubleParameter(spireAreaEffFreq['PSW'], \
-	unit=SolidAngle.STERADIANS,description='PSW beam area as measured on Neptune')
-beamProfs.meta['beamNeptunePmwSr']= DoubleParameter(spireAreaEffFreq['PMW'], \
-	unit=SolidAngle.STERADIANS,description='PMW beam area as measured on Neptune')
-beamProfs.meta['beamNeptunePlwSr']= DoubleParameter(spireAreaEffFreq['PLW'], \
-	unit=SolidAngle.STERADIANS,description='PLW beam area as measured on Neptune')
+beamProfs.meta['beamNeptunePswSr']= metaDict.newParameter('beamNeptunePswSr', spireAreaEffFreq['PSW'])
+beamProfs.meta['beamNeptunePmwSr']= metaDict.newParameter('beamNeptunePmwSr', spireAreaEffFreq['PMW'])
+beamProfs.meta['beamNeptunePlwSr']= metaDict.newParameter('beamNeptunePlwSr', spireAreaEffFreq['PLW'])
 #add Neptune spectral index to metadata (steradians)
-beamProfs.meta['alphaNeptunePsw']= DoubleParameter(alphaNep['PSW'],\
-	description='Neptune spectral used for PSW')
-beamProfs.meta['alphaNeptunePmw']= DoubleParameter(alphaNep['PMW'],\
-	description='Neptune spectral used for PMW')
-beamProfs.meta['alphaNeptunePlw']= DoubleParameter(alphaNep['PLW'],\
-	description='Neptune spectral used for PLW')
+beamProfs.meta['alphaNeptunePsw']= metaDict.newParameter('alphaNeptunePsw', alphaNep['PSW'])
+beamProfs.meta['alphaNeptunePmw']= metaDict.newParameter('alphaNeptunePmw', alphaNep['PMW'])
+beamProfs.meta['alphaNeptunePlw']= metaDict.newParameter('alphaNeptunePlw', alphaNep['PLW'])
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -652,7 +657,7 @@ beamProfs.meta['alphaNeptunePlw']= DoubleParameter(alphaNep['PLW'],\
 #-------------------------------------------------------------------------------
 #uses existing numbers as initial guess
 spireEffFreq = {"PSW":1224.06*1.e9,\
-	"PMW":873.07*1.e9,\
+	"PMW":878.07*1.e9,\
 	"PLW":609.86*1.e9}
 print '\nGenerating new effective frequencies...'
 
@@ -662,18 +667,9 @@ for band in spireBands:
 	  alphaNep[band], band, verbose=verbose)
 
 # update RadialBeamCorr metadata (in GHz)
-beamProfs.meta['freqEffPsw']=\
-  DoubleParameter(spireEffFreq['PSW']/1.e9,\
-  unit=Frequency.GIGAHERTZ,\
-  description='Effective frequency at which the measured PSW beam profile applies')
-beamProfs.meta['freqEffPmw']=\
-  DoubleParameter(spireEffFreq['PMW']/1.e9,\
-  unit=Frequency.GIGAHERTZ,\
-  description='Effective frequency at which the measured PMW beam profile applies')
-beamProfs.meta['freqEffPlw']=\
-  DoubleParameter(spireEffFreq['PLW']/1.e9,\
-  unit=Frequency.GIGAHERTZ,\
-  description='Effective frequency at which the measured PLW beam profile applies')
+beamProfs.meta['freqEffPsw'] = metaDict.newParameter('freqEffPsw', spireEffFreq['PSW']/1.e9)
+beamProfs.meta['freqEffPmw'] = metaDict.newParameter('freqEffPmw', spireEffFreq['PMW']/1.e9)
+beamProfs.meta['freqEffPlw'] = metaDict.newParameter('freqEffPlw', spireEffFreq['PLW']/1.e9)
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -682,9 +678,9 @@ beamProfs.meta['freqEffPlw']=\
 #-------------------------------------------------------------------------------
 
 #calculate monochromatic beam areas using full or simple beam treatment
-beamMonoArea={}
-beamAreaPipSr  = {}
-beamAreaPipArc  = {}
+beamMonoArea = {}
+beamAreaPipSr = {}
+beamAreaPipArc = {}
 print '\nCalculating monochromatic beam areas...'
 for band in spireBands:
 	print band
@@ -696,18 +692,12 @@ for band in spireBands:
 	  beamMonoArea[band], BB=False, alpha=-1)
 	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 
-beamProfs.meta['beamPipelinePswSr']= DoubleParameter(beamAreaPipSr['PSW'], \
-	unit=SolidAngle.STERADIANS,description='PSW beam area for spectral index alpha=-1 (as assumed in pipeline)')
-beamProfs.meta['beamPipelinePmwSr']= DoubleParameter(beamAreaPipSr['PMW'], \
-	unit=SolidAngle.STERADIANS,description='PMW beam area for spectral index alpha=-1 (as assumed in pipeline)')
-beamProfs.meta['beamPipelinePlwSr']= DoubleParameter(beamAreaPipSr['PLW'], \
-	unit=SolidAngle.STERADIANS,description='PLW beam area for spectral index alpha=-1 (as assumed in pipeline)')
-beamProfs.meta['beamPipelinePswArc']= DoubleParameter(beamAreaPipArc['PSW'], \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PSW beam area for spectral index alpha=-1 (as assumed in pipeline)')
-beamProfs.meta['beamPipelinePmwArc']= DoubleParameter(beamAreaPipArc['PMW'], \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PMW beam area for spectral index alpha=-1 (as assumed in pipeline)')
-beamProfs.meta['beamPipelinePlwArc']= DoubleParameter(beamAreaPipArc['PLW'], \
-	unit=SolidAngle.SQUARE_SECONDS_ARC,description='PLW beam area for spectral index alpha=-1 (as assumed in pipeline)')
+beamProfs.meta['beamPipelinePswSr'] = metaDict.newParameter('beamPipelinePswSr', beamAreaPipSr['PSW'])
+beamProfs.meta['beamPipelinePmwSr'] = metaDict.newParameter('beamPipelinePmwSr', beamAreaPipSr['PMW'])
+beamProfs.meta['beamPipelinePlwSr'] = metaDict.newParameter('beamPipelinePlwSr', beamAreaPipSr['PLW'])
+beamProfs.meta['beamPipelinePswArc']= metaDict.newParameter('beamPipelinePswArc', beamAreaPipArc['PSW'])
+beamProfs.meta['beamPipelinePmwArc']= metaDict.newParameter('beamPipelinePmwArc', beamAreaPipArc['PMW'])
+beamProfs.meta['beamPipelinePlwArc']= metaDict.newParameter('beamPipelinePlwArc', beamAreaPipArc['PLW'])
 
 #-------------------------------------------------------------------------------
 # Output to FITS files
@@ -716,9 +706,9 @@ if outputCalDirTree:
 else:
 	filename = java.io.File(r"%s//SCalPhotRadialCorrBeam_v%s.fits"%(dataDir, version))
 
-beamProfs.meta['fileName'] = herschel.ia.dataset.StringParameter(value=filename.name)
+beamProfs.meta['fileName'] = StringParameter(value=filename.name, description="Name of file when exported")
 fitsWriter = FitsArchive()
-fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.rules.append(metaDict.getFitsDictionary())
 fitsWriter.save(filename.toString(), beamProfs)
 
 #-------------------------------------------------------------------------------

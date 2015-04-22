@@ -74,7 +74,7 @@
 #   * spireEffBeam: Calculate the effective beam profile, area and beam map
 #
 #===============================================================================
-# $Id: makeSCalPhotColorCorrAperture.py,v 1.6 2014/11/14 16:05:17 epoleham Exp $
+# $Id: makeSCalPhotColorCorrAperture.py,v 1.5 2014/02/27 10:01:13 epoleham Exp $
 # 
 #  Edition History
 #   E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
@@ -87,11 +87,10 @@
 #                                     Removed analytical method section
 #  Chris North   - 04/Nov/2014   - Updated to use new beams
 #                                  removed constant beam from calculations where appropriate
-#  E. Polehampton  13/Nov/2014   - Tidy up metadata
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.6 $"
-metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
+scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.5 $"
+
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                              DIRECTORIES                            =====
@@ -112,7 +111,7 @@ dataDir = Configuration.getProperty('var.hcss.workdir')
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(jarFile='spire_cal_13_0_photTest2.jar')
+	cal=spireCal(pool='spire_cal_12_3')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -130,7 +129,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4EP"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -144,13 +143,15 @@ verbose = True
 apPhotRad={"PSW":22.,"PMW":30.,"PLW":45.}
 apPhotBGRad={'in':60.,'out':90.}
 # range of alphas to compute colour corrections for
-alphaK=[-4.,-3.5,-3.,-2.5,-2.,-1.5,-1.,-0.5,0.,0.5,1.,1.5,2.,2.5,3.,3.5,4.,4.5,5.]
-#alphaK=[-4,-1,2]
+#alphaK=[-4.,-3.5,-3.,-2.5,-2.,-1.5,-1.,-0.5,0.,0.5,1.,1.5,2.,2.5,3.,3.5,4.,4.5,5.]
+alphaK=[-4,-1,2]
 
 # range of beta and temp to calculate colour corrections for
 #betaK=[0.,0.5,1.,1.25,1.5,1.75,2.,2.5,3.]
 #tempK=range(3,300)
 
+# Example beam map to read in (to copy header info etc.)
+beamMapName="0x5000241aL_PSW_pmcorr_1arcsec_norm_beam.fits"
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -186,13 +187,10 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "3"
+	rsrfVersion = "2"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
-	# Example beam map to read in (to copy header info etc.)
-	beamMapVersion = "5"
-	beamMap = fitsReader("%s//Phot//SCalPhotBeamProf//SCalPhotBeamProf_PSW_fine_v%s.fits"%(directory, beamMapVersion))
 else:
 	#read RSRF from calibration tree
 	rsrf=cal.getPhot().getProduct('Rsrf')
@@ -219,18 +217,13 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
-if inputCalDirTree:
-	kBeamVersion = "4EP"
-	kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
-else:
-	kBeam=cal.getPhot().getProduct('ColorCorrBeam')
+kBeamVersion = "4"
+kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
+
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-if inputCalDirTree:
-	beamProfsVersion = "4EP"
-	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
-else:
-	beamProfs=cal.getPhot().getProduct('RadialCorrBeam')
+beamProfsVersion = "4"
+beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
 	"PLW":beamProfs.meta['freqEffPlw'].double*1.e9}
@@ -307,12 +300,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
-	####  DEPRECATED  ####
+	####  DEPRACATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
 	#isConst=beamNew.where(beamNew < beamConst)
 	#beamNew[isConst]=beamConst[isConst]
-	####  /DEPRECATED  ####
+	####  /DEPRACATED  ####
 
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -373,10 +366,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-	####  DEPRECATED  ####
+	####  DEPRACATED  ####
 	#get constant beam profile from calibration table
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	####  /DEPRECATED  ####
+	####  /DEPRACATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -664,23 +657,23 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 #-------------------------------------------------------------------------------
 
 #read in example map from file
-#try:
-#	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
-#except:
-#	#download if not available
-#	import urllib
-#	urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamMapName,\
-#	    os.path.join(dataDir,beamMapName))
-#	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
+try:
+	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
+except:
+	#download if not available
+	import urllib
+	urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamMapName,\
+	    os.path.join(dataDir,beamMapName))
+	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
 
 beamRad = beamProfs['core']['radius'].data
 
 # make map of radius (speeds up processing later)
 print 'Making beam Radius map'
 beamRadMap=SimpleImage()
-beamRadMap['image']=beamMap['image']
-nxMap=beamMap['image'].data[:,0].size
-nyMap=beamMap['image'].data[0,:].size
+beamRadMap['image']=beamIn['image']
+nxMap=beamIn['image'].data[:,0].size
+nyMap=beamIn['image'].data[0,:].size
 bcenter=[int(nxMap/2.),int(nyMap/2.)]
 for x in range(nxMap):
 	for y in range(nyMap):
@@ -700,16 +693,16 @@ apCorrFullNoBG.meta["modelName"].value = "FM"
 apCorrFullNoBG.meta["creationDate"].value = FineTime(java.util.Date())
 apCorrFullNoBG.meta["startDate"].value = FineTime(startDate)
 apCorrFullNoBG.meta["endDate"].value = FineTime(endDate)
-apCorrFullNoBG.meta["author"]  = metaDict.newParameter("author", "Chris North")
-apCorrFullNoBG.meta["dataOrigin"]  = metaDict.newParameter("dataOrigin","RSRF v%s; BeamProf PSW fine v%s; ColorCorrBeam v%s; RadialCorrBeam v%s"%(rsrfVersion, beamMapVersion, kBeamVersion, beamProfsVersion))
+apCorrFullNoBG.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
+#apCorrFullNoBG.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="%s"%inputFileName, description="Origin of the data")
 apCorrFullNoBG.meta["dependency"].value = "apertureCorrectionType"
-apCorrFullNoBG.meta["apertureCorrectionType"] = StringParameter(value="noBG", description="Aperture correction type (with/without background)")
+apCorrFullNoBG.meta["apertureCorrectionType"] = StringParameter(value="noBG", description="")
 apCorrFullNoBG.setVersion(version)
 apCorrFullNoBG.setFormatVersion(formatVersion)
 
 #copy product for including background
 apCorrFullIncBG = apCorrFullNoBG.copy()
-apCorrFullIncBG.meta["apertureCorrectionType"] = StringParameter(value="incBG", description="Aperture correction type (with/without background)")
+apCorrFullIncBG.meta["apertureCorrectionType"] = StringParameter(value="incBG", description="")
 
 #-----------------------------------------------------------------------
 # Compute aperture corrections for range of alpha

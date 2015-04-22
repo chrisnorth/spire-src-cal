@@ -74,7 +74,7 @@
 #   * spireEffArea: Calculate the effective beam area for a given spectrum
 #
 #===============================================================================
-# $Id: makeSCalPhotColorCorrBeam.py,v 1.6 2014/02/26 15:40:46 epoleham Exp $
+# $Id: makeSCalPhotColorCorrBeam.py,v 1.7 2014/11/14 16:05:17 epoleham Exp $
 # 
 #  Edition History
 #   E. Polehampton   22-10-2013  - First version adapted from Andreas' script - SPCAL-83
@@ -86,9 +86,11 @@
 #                                 SPCAL-109
 #  Chris North   - 04/Nov/2014 - 2.0: New beams (no constant part)
 #                                     removed constant from calculations where appropriate
+#  E. Polehampton - 10/Nov/2014 - Tidy up metadata
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 2.0 $"
+scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.7 $"
+metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -129,7 +131,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4"
+version = "4EP"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -181,7 +183,7 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "2"
+	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -211,7 +213,7 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "4"
+beamProfsVersion = "4EP"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -286,12 +288,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
 	#isConst=beamNew.where(beamNew < beamConst)
 	#beamNew[isConst]=beamConst[isConst]
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 	
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -352,10 +354,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#get constant beam profile from calibration table
 	beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	####  \DEPRACATED  ####
+	####  \DEPRECATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -470,12 +472,12 @@ for band in spireBands:
 
 # read pipeline values from beam profile calibration product
 
-beamAreaPipSr  = {'PSW':beamProfs.meta['beamPipelinePswSr'],\
-	'PMW':beamProfs.meta['beamPipelinePmwSr'],\
-	'PLW':beamProfs.meta['beamPipelinePlwSr']}
-beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'],\
-	'PMW':beamProfs.meta['beamPipelinePmwArc'],\
-	'PLW':beamProfs.meta['beamPipelinePlwArc']}
+beamAreaPipSr  = {'PSW':beamProfs.meta['beamPipelinePswSr'].value,\
+	'PMW':beamProfs.meta['beamPipelinePmwSr'].value,\
+	'PLW':beamProfs.meta['beamPipelinePlwSr'].value}
+beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'].value,\
+	'PMW':beamProfs.meta['beamPipelinePmwArc'].value,\
+	'PLW':beamProfs.meta['beamPipelinePlwArc'].value}
 #create dictionaries for filenames
 
 #-----------------------------------------------------------------------
@@ -485,12 +487,12 @@ beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'],\
 #-----------------------------------------------------------------------
 #-----------------------------------------------------------------------
 # Calculate pipeline colour correction parameters
-print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
-for band in spireBands:
-	#pipeline beam areas
-	beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
-	  beamMonoArea[band], BB=False, alpha=-1)
-	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
+#print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
+#for band in spireBands:
+#	#pipeline beam areas
+#	beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
+#	  beamMonoArea[band], BB=False, alpha=-1)
+#	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 
 #-----------------------------------------------------------------------
 #=======================================================================
@@ -511,8 +513,9 @@ kCorrBeam.meta["modelName"].value = "FM"
 kCorrBeam.meta["creationDate"].value = FineTime(java.util.Date())
 kCorrBeam.meta["startDate"].value = FineTime(startDate)
 kCorrBeam.meta["endDate"].value   = FineTime(endDate)
-kCorrBeam.meta["author"]  = herschel.ia.dataset.StringParameter(value="Chris North", description="Author of the data")
-kCorrBeam.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="v3.0", description="Origin of the data")
+kCorrBeam.meta["author"]  = metaDict.newParameter("author", "Chris North")
+kCorrBeam.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "RSRF v%s; RadialCorrBeam v%s"%(rsrfVersion, beamProfsVersion))
+
 kCorrBeam.setVersion(version)
 kCorrBeam.setFormatVersion(formatVersion)
 
@@ -569,18 +572,12 @@ for b in range(len(betaK)):
 			  beamAreaPipSr[band] / effBeamSr[betaTxt][band].data[t]
 
 #update ColorCorrBeam metadata
-kCorrBeam.meta['beamPswSr']=DoubleParameter(beamAreaPipSr['PSW'],\
- unit=SolidAngle.STERADIANS,description='PSW beam area for spectral index alpha=-1 (as assumed in the pipeline')
-kCorrBeam.meta['beamPmwSr']=DoubleParameter(beamAreaPipSr['PMW'],\
- unit=SolidAngle.STERADIANS,description='PMW beam area for spectral index alpha=-1 (as assumed in the pipeline')
-kCorrBeam.meta['beamPlwSr']=DoubleParameter(beamAreaPipSr['PLW'],\
- unit=SolidAngle.STERADIANS,description='PLW beam area for spectral index alpha=-1 (as assumed in the pipeline')
-kCorrBeam.meta['beamPswArc']=DoubleParameter(beamAreaPipArc['PSW'],\
- unit=SolidAngle.SQUARE_SECONDS_ARC,description='PSW beam area for spectral index alpha=-1 (as assumed in the pipeline')
-kCorrBeam.meta['beamPmwArc']=DoubleParameter(beamAreaPipArc['PMW'],\
- unit=SolidAngle.SQUARE_SECONDS_ARC,description='PMW beam area for spectral index alpha=-1 (as assumed in the pipeline')
-kCorrBeam.meta['beamPlwArc']=DoubleParameter(beamAreaPipArc['PLW'],\
- unit=SolidAngle.SQUARE_SECONDS_ARC,description='PLW beam area for spectral index alpha=-1 (as assumed in the pipeline')
+kCorrBeam.meta['beamPipelinePswSr'] = metaDict.newParameter('beamPipelinePswSr', beamAreaPipSr['PSW'])
+kCorrBeam.meta['beamPipelinePmwSr'] = metaDict.newParameter('beamPipelinePmwSr', beamAreaPipSr['PMW'])
+kCorrBeam.meta['beamPipelinePlwSr'] = metaDict.newParameter('beamPipelinePlwSr', beamAreaPipSr['PLW'])
+kCorrBeam.meta['beamPipelinePswArc']= metaDict.newParameter('beamPipelinePswArc', beamAreaPipArc['PSW'])
+kCorrBeam.meta['beamPipelinePmwArc']= metaDict.newParameter('beamPipelinePmwArc', beamAreaPipArc['PMW'])
+kCorrBeam.meta['beamPipelinePlwArc']= metaDict.newParameter('beamPipelinePlwArc', beamAreaPipArc['PLW'])
 
 # set FITS filename
 if outputCalDirTree:
@@ -593,5 +590,5 @@ kCorrBeam.meta['fileName'] = herschel.ia.dataset.StringParameter(value=kCorrBeam
 #-----------------------------------------------------------------------
 # write to FITS file
 fitsWriter = FitsArchive()
-fitsWriter.rules.append(herschel.spire.ia.util.MetaDataDictionary.getInstance().getFitsDictionary())
+fitsWriter.rules.append(metaDict.getFitsDictionary())
 fitsWriter.save(kCorrBeamFits.toString(), kCorrBeam)

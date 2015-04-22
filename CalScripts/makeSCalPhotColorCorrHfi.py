@@ -16,7 +16,7 @@
 #  Public License along with HCSS.
 #  If not, see <http://www.gnu.org/licenses/>.
 #
-# $Id: makeSCalPhotColorCorrHfi.py,v 1.3 2014/02/26 18:06:39 epoleham Exp $
+# $Id: makeSCalPhotColorCorrHfi.py,v 1.4 2014/11/14 16:05:17 epoleham Exp $
 #
 #===============================================================================
 # 
@@ -126,8 +126,9 @@
 #                                       Removed constant from calculations where appropriate
 #                                       
 #===============================================================================
+metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
-scriptVersionString = "makeSCalPhotColorCorrHfi.py $Revision: 1.3 $"
+scriptVersionString = "makeSCalPhotColorCorrHfi.py $Revision: 1.4 $"
 
 #directory = "..//..//..//..//..//..//data//spire//cal//SCal"
 #dataDir = "//disks//winchester2//calibration_data//"
@@ -153,7 +154,7 @@ outputCalDirTree=True
 # Input parameters
 
 # Colour correction table version
-version = "4"
+version = "4EP"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -179,19 +180,19 @@ hfiRIMOFile = '%s//%s'%(dataDir,hfiRIMOFileName)
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "2"
+	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal directory tree
 	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
  
 	# SPIRE Photometer radial beam profiles from cal directory tree
-	beamProfsVersion = "4"
+	beamProfsVersion = "4EP"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 
 	# SPIRE Photometer FluxConv from cal directory tree (for K4P and K4E parameters)
 	#>>>CHECKL is this the right way to read in one FluxConv product<<<
-	fluxConvVersion = "9"
+	fluxConvVersion = "10"
 	fluxConv = fitsReader("%s//Phot//SCalPhotFluxConv//SCalPhotFluxConv_nominal_20090819_v%s.fits"%(directory, fluxConvVersion))
 else:
 	rsrf=cal.getPhot().getProduct('Rsrf')
@@ -443,12 +444,12 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	beamNew=Double1d(nRad)
 	for r in range(nRad):
 		beamNew[r]=beamProfs.getCoreCorrection(radNew[r],array)
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#apply the "constant" beam where appropriate
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
 	#isConst=beamNew.where(beamNew < beamConst)
 	#beamNew[isConst]=beamConst[isConst]
-	####  /DEPRACATED  ####
+	####  /DEPRECATED  ####
 
 	#integrate to get solid angle (in arcsec^2)
 	
@@ -510,10 +511,10 @@ def spireMonoAreas(freq,beamProfs,effFreq,gamma,array,freqFact=100):
 
 	#get beam radius array from calibration table
 	beamRad=beamProfs.getCoreCorrectionTable().getColumn('radius').data
-	####  DEPRACATED  ####
+	####  DEPRECATED  ####
 	#get constant beam profile from calibration table
 	#beamConst=beamProfs.getConstantCorrectionTable().getColumn(array).data
-	####]  /DEPRACATED  ####
+	####]  /DEPRECATED  ####
 
 	# calculate at sparse frequencies
 	for fx in range(nNuArea):
@@ -913,7 +914,7 @@ photColorCorrHfi.meta["modelName"].value = "FM"
 photColorCorrHfi.meta["creationDate"].value = FineTime(java.util.Date())
 photColorCorrHfi.meta["startDate"].value = FineTime(startDate)
 photColorCorrHfi.meta["endDate"].value   = FineTime(endDate)
-photColorCorrHfi.meta["fileOrigin"]  = herschel.ia.dataset.StringParameter(value="%s"%hfiRIMOFileName, description="Origin of the data")
+photColorCorrHfi.meta["dataOrigin"]  =  metaDict.newParameter('dataOrigin', "%s; FluxConv v%s; RSRF v%s; RadialCorrBeam v%s; ApertureEfficiency v%s"%(hfiRIMOFileName, fluxConvVersion, rsrfVersion, beamProfsVersion, apertureEfficiencyVersion))
 photColorCorrHfi.setVersion(version)
 photColorCorrHfi.setFormatVersion(formatVersion)
 
@@ -937,7 +938,7 @@ else:
 	#
 	photColorCorrHfi.setTempVals(bvect)          # Spectral index of modified BB
 
-photColorCorrHfi.meta["gamma"] = DoubleParameter(gamma, "Exponent describing FWHM dependence on frequency used")
+photColorCorrHfi.meta["gamma"] = metaDict.newParameter('gamma',gamma)
 
 # Save colour correction tables into binary table
 photColorCorrHfi.setRatio545_857CorrVals(ratio545over857)  # Ratio 545/857 GHz filter
