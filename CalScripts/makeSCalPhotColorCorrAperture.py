@@ -632,7 +632,7 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 #print '\nCalculating aperture corrections corrections over alpha (analytical method)...'
 #for band in spireBands:
 #	for a in range(len(alphaK)):
-#		effBeam_x=spireEffBeam(freq,spireFiltOnly[band],beamProfs,spireEffFreq[band],\
+#		effBeam_x=spireEffBeam(freq,spireFilt[band],beamProfs,spireEffFreq[band],\
 #		  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
 #		print '%s alpha=%.1f'%(band,alphaK[a])
 #		# interpolate beam profile
@@ -743,7 +743,7 @@ for band in spireBands:
 		print '%s alpha=%.1f'%(band,alphaK[a])
 		#calculate beam areas
 		#effBeamPSW contains (beam area, beam profile, beam map)
-		effBeam_x=spireEffBeam(freq,spireFiltOnly[band],beamProfs,spireEffFreq[band],\
+		effBeam_x=spireEffBeam(freq,spireFilt[band],beamProfs,spireEffFreq[band],\
 		  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
 		effBeam_x['map']=spireEffBeamMap(beamRad,effBeam_x['profile'],beamRadMap,verbose=True)
 		#perform aperture photometry
