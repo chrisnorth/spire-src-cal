@@ -81,6 +81,7 @@
 #                                     "constant" table filled with zeros
 #                                     removed constant beam from calculations where appropriate
 # E. Polehampton   13-11-2014  - Tidy up metadata (use metadata dictionary)
+# Chris North      23-06-2015  - Added aperture efficiency to effective beam calculations
 #===============================================================================
 
 import os
@@ -127,7 +128,7 @@ writeLog = False
 #===============================================================================
 #-------------------------------------------------------------------------------
 # version number
-version = "4EP"
+version = "5"
 
 #read in core beam
 beamCoreIn = TableDataset()
@@ -201,30 +202,50 @@ if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal tree
 	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
+	# SPIRE aperture efficiency product from cal tree
+	apertureEfficiencyVersion = "1"
+	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
+		print 'Reading Aperture Efficiency version %s from calibration directory tree'%(apertureEfficiencyVersion)
 else:
 	#read RSRF from calibration tree
 	rsrf=cal.getPhot().getProduct('Rsrf')
 	rsrfVersion=rsrf.getVersion()
+	apertureEfficiency = cal.getPhot().getProduct('ApertureEfficiency')
+	apertureEfficiencyVersion=apertureEfficiency.getVersion()
 	if verbose:
 		print 'Reading RSRF version %s from calibration %s'%(rsrfVersion,cal.getVersion())
+		print 'Reading Aperture Efficiency version %s from calibration %s'%(apertureEfficiencyVersion,cal.getVersion())
 
+# Photometer RSRF
 spireFreq   = rsrf['rsrf']['frequency'].data*1e9  # Frequency in Hz
 #indexes of freq in rsrf
 ixR = freq.where((freq>=MIN(spireFreq)) & (freq<=MAX(spireFreq)))
 
+# Photometer Aperture Efficiency
+spireApEffFreq = apertureEfficiency.getApertEffTable()["frequency"].data * 1e9 #comes in [GHz]
+#indexes of freq in apEff
+ixA = freq.where((freq>=MIN(spireApEffFreq)) & (freq<=MAX(spireApEffFreq)))
+
 # spire RSRF only
 spireFiltOnly={}
+# spire RSRF * ApEff
+spireFilt={}
 
 #interpolate to freq array
 for band in spireBands:
-	#create Rsrf interpolation object
+	#create Rsrf and ApEff interpolation objects
 	interpRsrf = LinearInterpolator(spireFreq, rsrf.getRsrf(band))
-	#make arrays for final object
+	interpAp = LinearInterpolator(spireApEffFreq, apertureEfficiency.getApertEffTable()[band].data)
+	#make arrays for final objects
 	spireFiltOnly[band] = Double1d(nNu)
+	spireFilt[band] = Double1d(nNu)
 	#interpolate Rsrf to freq array
 	spireFiltOnly[band][ixR] = interpRsrf(freq[ixR])
+	#copy into Rsrf*ApEff array
+	spireFilt[band] = spireFiltOnly[band].copy()
+	spireFilt[band][ixA] = spireFilt[band][ixA] * interpAp(freq[ixA])
 
 #-------------------------------------------------------------------------------
 #===============================================================================
@@ -384,7 +405,7 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 	Inputs:
 	  freq:       (array float) frequency vector corresponding to RSRF values [Hz]
 	  transm:     (array float) relative spectral response (RSRF) corresponding to freq
-	                Note that this should *not* include the aperture efficiency
+	                Note that this *should* include the aperture efficiency
 	  monoArea:   (array float) monochromatic beam solid angle corresponding
 	                to frequencies in freq
 	  BB:         (boolean) spectral function to use for source spectrum:
@@ -662,7 +683,7 @@ spireEffFreq = {"PSW":1224.06*1.e9,\
 print '\nGenerating new effective frequencies...'
 
 for band in spireBands:
-	spireEffFreq[band] = spireFindEffFreq(freq, spireFiltOnly[band],
+	spireEffFreq[band] = spireFindEffFreq(freq, spireFilt[band],
 	  beamProfs,spireEffFreq[band], gamma, spireAreaEffFreq[band],
 	  alphaNep[band], band, verbose=verbose)
 
@@ -688,7 +709,7 @@ for band in spireBands:
 	beamMonoArea[band] = spireMonoAreas(freq, beamProfs, 
 	  spireEffFreq[band], gamma, band)
 	#pipeline beam areas
-	beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
+	beamAreaPipSr[band]=spireEffArea(freq, spireFilt[band], \
 	  beamMonoArea[band], BB=False, alpha=-1)
 	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 

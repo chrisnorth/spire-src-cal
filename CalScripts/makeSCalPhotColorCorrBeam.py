@@ -87,6 +87,7 @@
 #  Chris North   - 04/Nov/2014 - 2.0: New beams (no constant part)
 #                                     removed constant from calculations where appropriate
 #  E. Polehampton - 10/Nov/2014 - Tidy up metadata
+#  Chris North - 23/Jun/2014 -  Include aperture efficiency in Beam calculations
 #===============================================================================
 import os
 scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.7 $"
@@ -131,7 +132,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4EP"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -182,38 +183,57 @@ for band in spireBands:
 	spireRefFreq[band] = c/spireRefWl[band]
 
 if inputCalDirTree:
-	# SPIRE Photometer RSRF calibration product from cal directory tree
+	# SPIRE Photometer RSRF calibration product from cal tree
 	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
+	# SPIRE aperture efficiency product from cal tree
+	apertureEfficiencyVersion = "1"
+	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
+		print 'Reading Aperture Efficiency version %s from calibration directory tree'%(apertureEfficiencyVersion)
 else:
 	#read RSRF from calibration tree
 	rsrf=cal.getPhot().getProduct('Rsrf')
 	rsrfVersion=rsrf.getVersion()
+	apertureEfficiency = cal.getPhot().getProduct('ApertureEfficiency')
+	apertureEfficiencyVersion=apertureEfficiency.getVersion()
 	if verbose:
 		print 'Reading RSRF version %s from calibration %s'%(rsrfVersion,cal.getVersion())
+		print 'Reading Aperture Efficiency version %s from calibration %s'%(apertureEfficiencyVersion,cal.getVersion())
 
 # Photometer RSRF
 spireFreq   = rsrf['rsrf']['frequency'].data*1e9  # Frequency in Hz
 #indexes of freq in rsrf
 ixR = freq.where((freq>=MIN(spireFreq)) & (freq<=MAX(spireFreq)))
 
+# Photometer Aperture Efficiency
+spireApEffFreq = apertureEfficiency.getApertEffTable()["frequency"].data * 1e9 #comes in [GHz]
+#indexes of freq in apEff
+ixA = freq.where((freq>=MIN(spireApEffFreq)) & (freq<=MAX(spireApEffFreq)))
+
 # spire RSRF only
 spireFiltOnly={}
+# spire RSRF * ApEff
+spireFilt={}
 
 #interpolate to freq array
 for band in spireBands:
-	#create Rsrf interpolation object
+	#create Rsrf and ApEff interpolation objects
 	interpRsrf = LinearInterpolator(spireFreq, rsrf.getRsrf(band))
-	#make arrays for final object
+	interpAp = LinearInterpolator(spireApEffFreq, apertureEfficiency.getApertEffTable()[band].data)
+	#make arrays for final objects
 	spireFiltOnly[band] = Double1d(nNu)
+	spireFilt[band] = Double1d(nNu)
 	#interpolate Rsrf to freq array
 	spireFiltOnly[band][ixR] = interpRsrf(freq[ixR])
+	#copy into Rsrf*ApEff array
+	spireFilt[band] = spireFiltOnly[band].copy()
+	spireFilt[band][ixA] = spireFilt[band][ixA] * interpAp(freq[ixA])
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "4EP"
+beamProfsVersion = "5"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -490,7 +510,7 @@ beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'].value,\
 #print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
 #for band in spireBands:
 #	#pipeline beam areas
-#	beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
+#	beamAreaPipSr[band]=spireEffArea(freq, spireFilt[band], \
 #	  beamMonoArea[band], BB=False, alpha=-1)
 #	beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 
@@ -541,7 +561,7 @@ for band in spireBands:
 
 	for a in range(len(alphaK)):
 		#effective area
-		effBeamSr['alpha'][band].data[a]=spireEffArea(freq, spireFiltOnly[band],
+		effBeamSr['alpha'][band].data[a]=spireEffArea(freq, spireFilt[band],
 		  beamMonoArea[band], BB=False, alpha=alphaK[a])
 		#beam correction factor
 		kCorrBeam['alpha'][band].data[a] = \
@@ -565,7 +585,7 @@ for b in range(len(betaK)):
 		kCorrBeam[betaTxt].addColumn(band,Column(Float1d(len(tempK))))
 		for t in range(len(tempK)):
 			#effective area
-			effBeamSr[betaTxt][band].data[t]=spireEffArea(freq, spireFiltOnly[band],
+			effBeamSr[betaTxt][band].data[t]=spireEffArea(freq, spireFilt[band],
 			  beamMonoArea[band], BB=True, beta=betaK[b], temp=tempK[t])
 			#beam correction factor
 			kCorrBeam[betaTxt][band].data[t] = \

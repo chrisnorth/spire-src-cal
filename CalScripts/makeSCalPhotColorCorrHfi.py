@@ -154,7 +154,7 @@ outputCalDirTree=True
 # Input parameters
 
 # Colour correction table version
-version = "4EP"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -187,12 +187,12 @@ if inputCalDirTree:
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
  
 	# SPIRE Photometer radial beam profiles from cal directory tree
-	beamProfsVersion = "4EP"
+	beamProfsVersion = "5"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 
 	# SPIRE Photometer FluxConv from cal directory tree (for K4P and K4E parameters)
 	#>>>CHECKL is this the right way to read in one FluxConv product<<<
-	fluxConvVersion = "10"
+	fluxConvVersion = "11"
 	fluxConv = fitsReader("%s//Phot//SCalPhotFluxConv//SCalPhotFluxConv_nominal_20090819_v%s.fits"%(directory, fluxConvVersion))
 else:
 	rsrf=cal.getPhot().getProduct('Rsrf')
@@ -789,7 +789,7 @@ if fixBeta == True:
 		kPLW = hpXcalKcorr(spireRefFreq[2], freq, spireFiltPLW, \
 		  BB=True, temp=temp, beta=beta0, ext=True, monoArea=beamMonoAreaPLW)
 		## convert to flux density using effective beam area
-		##kPLW[0] = kPLW[0] * spireEffArea(freq, spireFiltOnlyPLW,
+		##kPLW[0] = kPLW[0] * spireEffArea(freq, spireFiltPLW,
 		#  beamMonoAreaPLW, BB=True, temp=temp, beta=beta0)
 		## K-correction from HFI-545 to PLW		
 		#k545toPLW.append(k545[0] / kPLW[0] * k4E_PLW / k4E_545 * kPLW[1] / k545[1])
@@ -803,7 +803,7 @@ if fixBeta == True:
 		kPMW = hpXcalKcorr(spireRefFreq[1], freq, spireFiltPMW, \
 		  BB=True, temp=temp, beta=beta0, ext=True, monoArea=beamMonoAreaPMW)
 		# convert to flux density using effective beam area
-		#kPMW[0] = kPMW[0] * spireEffArea(freq, spireFiltOnlyPMW,
+		#kPMW[0] = kPMW[0] * spireEffArea(freq, spireFiltPMW,
 		#  beamMonoAreaPMW, BB=True, temp=temp, beta=beta0)
 		## K-correction from HFI-857 to PMW
 		#k857toPMW.append(k857[0] / kPMW[0] * k4E_PMW / k4E_857 * kPMW[1] / k857[1])
@@ -814,7 +814,7 @@ if fixBeta == True:
 		kPSW = hpXcalKcorr(spireRefFreq[0], freq,  spireFiltPSW, \
 		  BB=True, temp=temp, beta=beta0, ext=True, monoArea=beamMonoAreaPSW)
 		## convert to flux density using effective beam area
-		#kPSW[0] = kPSW[0] * spireEffArea(freq, spireFiltOnlyPSW,
+		#kPSW[0] = kPSW[0] * spireEffArea(freq, spireFiltPSW,
 		#  beamMonoAreaPSW, BB=True, temp=temp, beta=beta0)
 		## K-correction from HFI-857 to PSW
 		#k857toPSW.append(k857[0] / kPSW[0] * k4E_PSW / k4E_857 * kPSW[1] / k857[1])
@@ -835,7 +835,7 @@ else:
 		kPLW = hpXcalKcorr(spireRefFreq[2], freq, spireFiltPLW, \
 		  BB=True, temp=temp0, beta=beta, ext=True, monoArea=monoAreaPLW)
 		# convert to flux density using effective beam area
-		kPLW[0] = kPLW[0] * spireEffArea(freq, spireFiltOnlyPLW,
+		kPLW[0] = kPLW[0] * spireEffArea(freq, spireFiltPLW,
 		  beamMonoAreaPLW, BB=True, temp=temp0, beta=beta)
 		k545toPLW.append(k545[0] / kPLW[0] * k4E_PLW / k4E_545 * kPLW[1] / k545[1])
 		#
@@ -845,7 +845,7 @@ else:
 		kPMW = hpXcalKcorr(spireRefFreq[1], freq, spireFiltPMW, \
 		  BB=True, temp=temp0, beta=beta, ext=True, monoArea=monoAreaPMW)
 		# convert to flux density using effective beam area
-		kPMW[0] = kPMW[0] * spireEffArea(freq, spireFiltOnlyPMW,
+		kPMW[0] = kPMW[0] * spireEffArea(freq, spireFiltPMW,
 		  beamMonoAreaPMW, BB=True, temp=temp0, beta=beta)
 		k857toPMW.append(k857[0] / kPMW[0] * k4E_PMW / k4E_857 * kPMW[1] / k857[1])
 		#
@@ -854,7 +854,7 @@ else:
 		  BB=True, temp=temp0, beta=beta, ext=True, monoArea=monoAreaPSW)
 		k857toPSW.append(k857[0] / kPSW[0] * k4E_PSW / k4E_857 * kPSW[1] / k857[1])
 		# convert to flux density using effective beam area
-		kPSW[0] = kPSW[0] * spireEffArea(freq, spireFiltOnlyPSW,
+		kPSW[0] = kPSW[0] * spireEffArea(freq, spireFiltPSW,
 		  beamMonoAreaPSW, BB=True, temp=temp0, beta=beta)
 		#
 		# Ratio of 545 and 845 GHz filters

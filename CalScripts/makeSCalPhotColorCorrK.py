@@ -137,7 +137,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4EP"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -238,12 +238,12 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
-kBeamVersion = "4EP"
+kBeamVersion = "5"
 kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "4EP"
+beamProfsVersion = "5"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -692,7 +692,7 @@ beamAreaPipArc = {'PSW':beamProfs.meta['beamPipelinePswArc'].value,\
 #print '\nGenerating new pipeline beam areas for ColorCorrBeam version %s'%version
 for band in spireBands:
 	#pipeline beam areas
-	#beamAreaPipSr[band]=spireEffArea(freq, spireFiltOnly[band], \
+	#beamAreaPipSr[band]=spireEffArea(freq, spireFilt[band], \
 	#  beamMonoArea[band], BB=False, alpha=-1)
 	#beamAreaPipArc[band]=beamAreaPipSr[band]/arcsec2Sr
 	#pipeline point source K4P conversion
