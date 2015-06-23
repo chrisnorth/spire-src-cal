@@ -130,7 +130,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "4EP"
+version = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -205,29 +205,41 @@ spireFreq   = rsrf['rsrf']['frequency'].data*1e9  # Frequency in Hz
 #indexes of freq in rsrf
 ixR = freq.where((freq>=MIN(spireFreq)) & (freq<=MAX(spireFreq)))
 
+# Photometer Aperture Efficiency
+spireApEffFreq = apertureEfficiency.getApertEffTable()["frequency"].data * 1e9 #comes in [GHz]
+#indexes of freq in apEff
+ixA = freq.where((freq>=MIN(spireApEffFreq)) & (freq<=MAX(spireApEffFreq)))
+
 # spire RSRF only
 spireFiltOnly={}
+# spire RSRF * ApEff
+spireFilt={}
 
 #interpolate to freq array
 for band in spireBands:
-	#create Rsrf object
+	#create Rsrf and ApEff interpolation objects
 	interpRsrf = LinearInterpolator(spireFreq, rsrf.getRsrf(band))
-	#make arrays for final object
+	interpAp = LinearInterpolator(spireApEffFreq, apertureEfficiency.getApertEffTable()[band].data)
+	#make arrays for final objects
 	spireFiltOnly[band] = Double1d(nNu)
+	spireFilt[band] = Double1d(nNu)
 	#interpolate Rsrf to freq array
 	spireFiltOnly[band][ixR] = interpRsrf(freq[ixR])
+	#copy into Rsrf*ApEff array
+	spireFilt[band] = spireFiltOnly[band].copy()
+	spireFilt[band][ixA] = spireFilt[band][ixA] * interpAp(freq[ixA])
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
 if inputCalDirTree:
-	kBeamVersion = "4EP"
+	kBeamVersion = "5"
 	kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 else:
 	kBeam=cal.getPhot().getProduct('ColorCorrBeam')
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
 if inputCalDirTree:
-	beamProfsVersion = "4EP"
+	beamProfsVersion = "5"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 else:
 	beamProfs=cal.getPhot().getProduct('RadialCorrBeam')
