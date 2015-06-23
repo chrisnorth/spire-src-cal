@@ -88,6 +88,7 @@
 #  Chris North   - 04/Nov/2014   - Updated to use new beams
 #                                  removed constant beam from calculations where appropriate
 #  E. Polehampton  13/Nov/2014   - Tidy up metadata
+#  Chris North     23/Jun/2014   -  Include aperture efficiency in beam calculations
 #===============================================================================
 import os
 scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.6 $"
