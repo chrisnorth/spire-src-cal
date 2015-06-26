@@ -128,8 +128,8 @@ print '$K_\\mathrm{MonE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kMonE
 print '$K_\\mathrm{PtoE}$ (MJy/sr per Jy/beam) & %.3f & %.3f & %.3f \\\\'%(kPtoE['PSW'],kPtoE['PMW'],kPtoE['PLW'])
 print '$\\Omega_\\mathrm{pip}$ (arcsec$^2$) & %.2f & %.2f & %.2f \\\\'%(pipBeamArc['PSW'],pipBeamArc['PMW'],pipBeamArc['PLW'])
 print '\\hline'
-print '$K_\\mathrm{4E}$ & %.4f & %.4f & %.4f \\\\'%(k4E['PSW'],k4E['PMW'],k4E['PLW'])
-print '$K_\\mathrm{4E}/K_\\mathrm{4P}$ & %.4f & %.4f & %.4f '%(k4E4P['PSW'],k4E4P['PMW'],k4E4P['PLW'])
+#print '$K_\\mathrm{4E}$ & %.4f & %.4f & %.4f \\\\'%(k4E['PSW'],k4E['PMW'],k4E['PLW'])
+#print '$K_\\mathrm{4E}/K_\\mathrm{4P}$ & %.4f & %.4f & %.4f '%(k4E4P['PSW'],k4E4P['PMW'],k4E4P['PLW'])
 print '\\end{tabular}'
 
 #-------------------------------------------------------------------------------
@@ -140,9 +140,9 @@ print '\\hline\\hline'
 print 'Band & PSW & PMW & PLW\\\\'
 print '\hline'
 print '$\\alpha_\\mathrm{Nep}$ & %.2f & %.2f & %.2f \\\\'%(alphaNep['PSW'],alphaNep['PMW'],alphaNep['PLW'])
-print 'Major$\\times$Minor\\- FWHM (arcsec) & 18.3$\\times$17.0 & 24.7$\\times$23.2 & 37.0$\\times$33.4 \\\\'
-print 'Geometric mean FWHM ($\\theta_\\mathrm{Nep}$, arcsec) & 17.6 & 23.9 & 35.2 \\\\'
-print 'Ellip\\-ticity (\\%%)& 8.1 & 6.6 & 10.9 \\\\'
+print 'Major$\\times$Minor\\- FWHM (arcsec) & 18.3$\\times$17.0 & 24.7$\\times$23.2 & 37.0$\\times$33.4 \\\\' #Hard-coded
+print 'Geometric mean FWHM ($\\theta_\\mathrm{Nep}$, arcsec) & 17.6 & 23.9 & 35.2 \\\\' #Hard-coded
+print 'Ellipticity (\\%%)& 8.1 & 6.6 & 10.9 \\\\' #Hard-coded
 #print 'Measured beam solid angle ($\\Omega_\\mathrm{Nep}$, arcsec$^2$) & 450 & 795 & 1665 \\\\'
 print 'Measured beam solid angle ($\\Omega_\\mathrm{Nep}$, arcsec$^2$) & %.0f & %.0f & %.0f \\\\'%\
 	(beamNepArc['PSW'],beamNepArc['PMW'],beamNepArc['PLW'])
