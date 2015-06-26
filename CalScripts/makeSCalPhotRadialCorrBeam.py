@@ -130,6 +130,10 @@ writeLog = False
 # version number
 version = "5"
 
+# Input data version numbers
+rsrfVersion = "3"
+apertureEfficiencyVersion = "1"
+
 #read in core beam
 beamCoreIn = TableDataset()
 beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
@@ -176,7 +180,7 @@ gamma = -0.85
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                         READ FILTER PROFILES                        =====
-#===============================================================================
+#=============rsrfVersion = "3"==================================================================
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------
@@ -200,10 +204,8 @@ spireBands=["PSW","PMW","PLW"]
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal tree
-	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal tree
-	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -558,7 +560,7 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 
 		if simpleBeam:
 			beamMonoNew=spireMonoAreasSimple(freq,effFreqs[1],areaNep,gamma)
-		else:
+		else:kBeamVersion = "5"
 			beamMonoNew=spireMonoAreas(freq,beamProfs,effFreqs[1],gamma,array,freqFact=freqFact)
 		effAreas[1]=spireEffArea(freq,rsrf, beamMonoNew, BB=False, alpha=alphaNep)
 
@@ -569,7 +571,7 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 		if (Math.abs(relAreas[1]) < reqPrec):
 			done=True
 	if ((iter > maxIter) and (done==False)):
-		print "  Warning: maximum iterations [%d] exceeded without conversion [%g]"%(maxIter,reqPrec)
+		print "  Warning: maximum iterkBeamVersion = "5"ations [%d] exceeded without conversion [%g]"%(maxIter,reqPrec)
 
 	if verbose:
 		print '  Final %s effFreq: %.4f'%(array,effFreqs[1]/1.e9)
@@ -604,7 +606,7 @@ beamProfs.meta["startDate"].value = FineTime(startDate)
 beamProfs.meta["endDate"].value = FineTime(endDate)
 beamProfs.setVersion(version)
 beamProfs.setFormatVersion(formatVersion)
-beamProfs.meta['dataOrigin'] = metaDict.newParameter('dataOrigin', "%s; RSRF v%s"%(beamProfInFileNames[2:],rsrfVersion))
+beamProfs.meta['dataOrigin'] = metaDict.newParameter('dataOrigin', "%s; RSRF v%s; Aperture Efficency v%s"%(beamProfInFileNames[2:],rsrfVersion,apertureEfficiencyVersion))
 beamProfs.meta["author"]  = metaDict.newParameter("author", "Chris North")
 
 #read in beams from file

@@ -140,6 +140,12 @@ outputCalDirTree=True
 # Colour correction table version
 version = "5"
 
+# Input data version numbers
+rsrfVersion = "3"
+apertureEfficiencyVersion = "1"
+kBeamVersion = "5"
+beamProfsVersion = "5"
+
 # set format version and date format
 formatVersion = "1.0"
 df  = java.text.SimpleDateFormat("yyyy.MM.dd/HH:mm:ss/z")
@@ -190,10 +196,8 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal tree
-	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -239,12 +243,10 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
-kBeamVersion = "5"
 kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "5"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -517,7 +519,7 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 	  is calculated. Note that the integrals are coded as simple sums as the 
 	  HIPE numeric integral doesn't allow too may discrete points and the RSRF
 	  is sampled to quite some detail.
-
+beamProfsVersion = "5"
 	  N.B. If ext=True, and monoBeam is in units sr, then this procedure outputs
 	    K-correction factor in [Jy/sr per Jy/beam] and Sky emission in Jy/sr.
 	    Units will change if a different input unit is used.
@@ -559,7 +561,7 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 	if ext == True:
 		area = monoArea
 	else:
-		#don't use area for point sources
+		#don't use area for poinbeamProfsVersion = "5"t sources
 		area = Float1d(len(freq))
 		area[:] = 1.0
 
@@ -569,7 +571,7 @@ def hpXcalKcorr(freq0, freq, transm, BB=True, temp=20.0, beta=1.8, alpha=-1.0,
 	numInterp=LinearInterpolator(freq,transm)
 	denomInterp=LinearInterpolator(freq,transm * fSky * area)
 	minFreq=min(freq)
-	maxFreq=max(freq)
+	maxFreq=max(freq)beamProfsVersion = "5"
 
 	integrator=TrapezoidalIntegrator(minFreq,maxFreq)
 	numInteg = integrator.integrate(numInterp)
@@ -737,7 +739,7 @@ kCorrPsrc.meta["creationDate"].value = FineTime(java.util.Date())
 kCorrPsrc.meta["startDate"].value = FineTime(startDate)
 kCorrPsrc.meta["endDate"].value   = FineTime(endDate)
 kCorrPsrc.meta["author"]  = metaDict.newParameter("author", "Chris North")
-kCorrPsrc.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "ApertureEfficiency v%s; RSRF v%s; RadialBeamProf v%s; ColorCorrBeam v%s"%(apertureEfficiencyVersion, rsrfVersion, beamProfsVersion, kBeamVersion))
+kCorrPsrc.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "RSRF v%s; ApertureEfficiency v%s; RadialBeamProf v%s; ColorCorrBeam v%s"%(rsrfVersion, apertureEfficiencyVersion, beamProfsVersion, kBeamVersion))
 kCorrPsrc.meta["dependency"].value = "correctionSourceType"
 kCorrPsrc.meta["correctionSourceType"] = StringParameter(value="point", description="Type of colour correction (point or extended)")
 kCorrPsrc.setVersion(version)

@@ -134,6 +134,11 @@ outputCalDirTree=True
 # Colour correction table version
 version = "5"
 
+# Input data version numbers
+rsrfVersion = "3"
+apertureEfficiencyVersion = "1"
+beamProfsVersion = "5"
+
 # set format version and date format
 formatVersion = "1.0"
 df  = java.text.SimpleDateFormat("yyyy.MM.dd/HH:mm:ss/z")
@@ -184,10 +189,8 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal tree
-	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal tree
-	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -233,7 +236,6 @@ for band in spireBands:
 
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
-beamProfsVersion = "5"
 beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 spireEffFreq = {"PSW":beamProfs.meta['freqEffPsw'].double*1.e9,\
 	"PMW":beamProfs.meta['freqEffPmw'].double*1.e9,\
@@ -534,7 +536,7 @@ kCorrBeam.meta["creationDate"].value = FineTime(java.util.Date())
 kCorrBeam.meta["startDate"].value = FineTime(startDate)
 kCorrBeam.meta["endDate"].value   = FineTime(endDate)
 kCorrBeam.meta["author"]  = metaDict.newParameter("author", "Chris North")
-kCorrBeam.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "RSRF v%s; RadialCorrBeam v%s"%(rsrfVersion, beamProfsVersion))
+kCorrBeam.meta["dataOrigin"]  = metaDict.newParameter('dataOrigin', "RSRF v%s; Aperture Efficiency v%s; RadialCorrBeam v%s"%(rsrfVersion, apertureEfficiencyVersion, beamProfsVersion))
 
 kCorrBeam.setVersion(version)
 kCorrBeam.setFormatVersion(formatVersion)

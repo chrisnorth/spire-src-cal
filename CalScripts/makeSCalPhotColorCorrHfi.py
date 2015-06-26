@@ -157,6 +157,12 @@ outputCalDirTree=True
 # Colour correction table version
 version = "5"
 
+# Input data version numbers
+rsrfVersion = "3"
+apertureEfficiencyVersion = "1"
+beamProfsVersion = "5"
+fluxConvVersion = "11"
+
 # set format version and date format
 formatVersion = "1.0"
 df  = java.text.SimpleDateFormat("yyyy.MM.dd/HH:mm:ss/z")
@@ -181,19 +187,15 @@ hfiRIMOFile = '%s//%s'%(dataDir,hfiRIMOFileName)
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal directory tree
-	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
  
 	# SPIRE Photometer radial beam profiles from cal directory tree
-	beamProfsVersion = "5"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 
 	# SPIRE Photometer FluxConv from cal directory tree (for K4P and K4E parameters)
 	#>>>CHECKL is this the right way to read in one FluxConv product<<<
-	fluxConvVersion = "11"
 	fluxConv = fitsReader("%s//Phot//SCalPhotFluxConv//SCalPhotFluxConv_nominal_20090819_v%s.fits"%(directory, fluxConvVersion))
 else:
 	rsrf=cal.getPhot().getProduct('Rsrf')

@@ -117,6 +117,7 @@ reCalc=False
 if reCalc==False:
 	fileInNoBG = 'ApertureCorrNoBG_BS-Apr2015.csv'
 	fileInIncBG = 'ApertureCorrIncBG_BS-Apr2015.csv'
+	apCorrInFileNames = '%s, %s'%(fileInNoBG,fileInIncBG)
 
 # if inputCalDirTree is True, then calibration products are read from a
 #  calibration directory tree
@@ -145,6 +146,12 @@ outputCalDirTree=True
 
 # Colour correction table version
 version = "5"
+
+# Input data version numbers
+rsrfVersion = "3"
+apertureEfficiencyVersion = "1"
+kBeamVersion = "5"
+beamProfsVersion = "5"
 
 # set format version and date format
 formatVersion = "1.0"
@@ -200,10 +207,8 @@ for band in spireBands:
 
 if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
-	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
 	# SPIRE aperture efficiency product from cal tree
-	apertureEfficiencyVersion = "1"
 	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
@@ -250,14 +255,12 @@ for band in spireBands:
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam Color Corrections
 if inputCalDirTree:
-	kBeamVersion = "5"
 	kBeam=fitsReader("%s//Phot//SCalPhotColorCorrBeam//SCalPhotColorCorrBeam_v%s.fits"%(directory, kBeamVersion))
 else:
 	kBeam=cal.getPhot().getProduct('ColorCorrBeam')
 #-------------------------------------------------------------------------------
 # Load SPIRE Beam profiles
 if inputCalDirTree:
-	beamProfsVersion = "5"
 	beamProfs = fitsReader("%s//Phot//SCalPhotRadialCorrBeam//SCalPhotRadialCorrBeam_v%s.fits"%(directory, beamProfsVersion))
 else:
 	beamProfs=cal.getPhot().getProduct('RadialCorrBeam')
@@ -777,6 +780,8 @@ else:
 	for band in spireBands:
 		apCorrFullNoBG['alpha'][band].data = apCorrInNoBG[band].data
 		apCorrFullIncBG['alpha'][band].data = apCorrInIncBG[band].data
+	apCorrFullNoBG.meta["dataOrigin"].value = "%s"%(fileInNoBG)
+	apCorrFullIncBG.meta["dataOrigin"].value = "%s"%(fileInIncBG)
 
 # set FITS filenames
 if outputCalDirTree:
