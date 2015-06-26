@@ -92,11 +92,11 @@
 #   Chris North      04-11-2014  - updated to use new beams (no constant part)
 #                                  removed constant from calculations where appropriate
 #  E. Polehampton    10-11-2014  - Tidy up metadata
-#  Chris North      23/Jun/2014  -  Include aperture efficiency in beam calculations
+#  Chris North       26-06-2015  - (v1.11) Include aperture efficiency in beam calculations
 #
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrK.py $Revision: 1.10 $"
+scriptVersionString = "makeSCalPhotColorCorrK.py $Revision: 1.11 $"
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------

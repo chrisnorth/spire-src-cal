@@ -89,11 +89,11 @@
 #                                  removed constant beam from calculations where appropriate
 #  E. Polehampton  13/Nov/2014   - Tidy up metadata
 #  Chris North     23/Jun/2015   - Include aperture efficiency in beam calculations
-#  Chris North     26/Jun/2015   - Read from Bernhard Schulz' data tables (reCalc=False)
-#                                - Edited dataOrigin metadata
+#  Chris North     26/Jun/2015   - (v1.8) Read from Bernhard Schulz' data tables (reCalc=False)
+#                                         Edited dataOrigin metadata
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.6 $"
+scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.8 $"
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 #-------------------------------------------------------------------------------
 #===============================================================================

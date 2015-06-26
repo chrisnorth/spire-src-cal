@@ -76,17 +76,17 @@
 #                                     Used for spire_cal_12_1
 # Chris North      26-02-2014  - 1.1: Added writing of ascii tables and log file
 #                                   SPCAL-109  
-# Chris North      04-11-2014  - 2.0: SPCAL-126 Used new beams (no constant section)
+# Chris North      04-11-2014  - SPCAL-126 Used new beams (no constant section)
 #                                     Changed Neptune beam areas to B. Schulz values
 #                                     "constant" table filled with zeros
 #                                     removed constant beam from calculations where appropriate
 # E. Polehampton   13-11-2014  - Tidy up metadata (use metadata dictionary)
-# Chris North      23-06-2015  - Added aperture efficiency to effective beam calculations
+# Chris North      26-06-2015  - (v1.8) Added aperture efficiency to effective beam calculations
 #===============================================================================
 
 import os
 from herschel.share.unit import *
-scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.7 $"
+scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.8 $"
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------

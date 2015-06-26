@@ -124,12 +124,12 @@
 #  Chris North     - 25/Feb/2014 - 2.8: BUG FIX: Uses KmonE not K4E in calculations (SPCAL-109)
 #  Chris North     - 04/Nov/2014 - 3.0: Updated to use new beams (no constant area)
 #                                       Removed constant from calculations where appropriate
-#  Chris North     - 23/Jun/2014 -      Include aperture efficiency in beam calculations
+#  Chris North     - 26/Jun/2014 - 1.5: Include aperture efficiency in beam calculations
 #                                       
 #===============================================================================
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
-scriptVersionString = "makeSCalPhotColorCorrHfi.py $Revision: 1.4 $"
+scriptVersionString = "makeSCalPhotColorCorrHfi.py $Revision: 1.5 $"
 
 #directory = "..//..//..//..//..//..//data//spire//cal//SCal"
 #dataDir = "//disks//winchester2//calibration_data//"

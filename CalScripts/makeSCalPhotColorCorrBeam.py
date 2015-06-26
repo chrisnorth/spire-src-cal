@@ -81,16 +81,17 @@
 #   E. Polehampton   31-10-2013  - update for new input file
 #   E. Polehampton   01-11-2013  - Add beam area metadata
 #   E. Polehampton   23-01-2014  - Update values (SPCAL-98)
-#  Chris North   - 18/Feb/2014 - 1.0: First version (complete calculation)
+#  Chris North       18/Feb/2014 - 1.0: First version (complete calculation)
 #                                     Used for spire_cal_12_1
-#                                 SPCAL-109
-#  Chris North   - 04/Nov/2014 - 2.0: New beams (no constant part)
+#                                  SPCAL-109
+#  Chris North       04-11-2014  - New beams (no constant part)
 #                                     removed constant from calculations where appropriate
-#  E. Polehampton - 10/Nov/2014 - Tidy up metadata
-#  Chris North - 23/Jun/2014 -  Include aperture efficiency in Beam calculations
+#  E. Polehampton    10-11-2014  - Tidy up metadata
+#  Chris North       26-06-2015  - (v1.8) Include aperture efficiency in Beam calculations
+#              
 #===============================================================================
 import os
-scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.7 $"
+scriptVersionString = "makeSCalPhotColorCorrBeam.py $Revision: 1.8 $"
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------
@@ -464,7 +465,7 @@ def spireEffArea(freq, transm, monoArea, BB=False, temp=20.0, beta=1.8, alpha=-1
 #=====                           END OF FUNCTIONS                          =====
 #===============================================================================
 #-------------------------------------------------------------------------------
-
+7
 #-------------------------------------------------------------------------------
 #===============================================================================
 #=====                  CALCULATE MONOCHROMATIC BEAM AREAS                 =====
