@@ -88,7 +88,9 @@
 #  Chris North   - 04/Nov/2014   - Updated to use new beams
 #                                  removed constant beam from calculations where appropriate
 #  E. Polehampton  13/Nov/2014   - Tidy up metadata
-#  Chris North     23/Jun/2014   -  Include aperture efficiency in beam calculations
+#  Chris North     23/Jun/2015   - Include aperture efficiency in beam calculations
+#  Chris North     26/Jun/2015   - Read from Bernhard Schulz' data tables (reCalc=False)
+#                                - Edited dataOrigin metadata
 #===============================================================================
 import os
 scriptVersionString = "makeSCalPhotColorCorrAperture.py $Revision: 1.6 $"
@@ -104,6 +106,17 @@ metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 #LOCAL VERSION
 directory = Configuration.getProperty('var.hcss.workdir')
 dataDir = Configuration.getProperty('var.hcss.workdir')
+
+# if reCalc is True, then Aperture corrections are calculated following
+#   the procedures below
+# If reCalc is False, then tables are read from input files from
+#   Bernhard Schulz's IDL code, based on maps with nominal pixel sizes
+# ***Thes produce slightly different results***
+# ***RECOMMENDATION: reCalc = False
+reCalc=False
+if reCalc==False:
+	fileInNoBG = 'ApertureCorrNoBG_BS-Apr2015.csv'
+	fileInIncBG = 'ApertureCorrIncBG_BS-Apr2015.csv'
 
 # if inputCalDirTree is True, then calibration products are read from a
 #  calibration directory tree
@@ -189,17 +202,21 @@ if inputCalDirTree:
 	# SPIRE Photometer RSRF calibration product from cal directory tree
 	rsrfVersion = "3"
 	rsrf = fitsReader("%s//Phot//SCalPhotRsrf//SCalPhotRsrf_v%s.fits"%(directory, rsrfVersion))
+	# SPIRE aperture efficiency product from cal tree
+	apertureEfficiencyVersion = "1"
+	apertureEfficiency = fitsReader("%s//Phot//SCalPhotApertureEfficiency//SCalPhotApertureEfficiency_v%s.fits"%(directory, apertureEfficiencyVersion))
 	if verbose:
 		print 'Reading RSRF version %s from calibration directory tree'%(rsrfVersion)
-	# Example beam map to read in (to copy header info etc.)
-	beamMapVersion = "5"
-	beamMap = fitsReader("%s//Phot//SCalPhotBeamProf//SCalPhotBeamProf_PSW_fine_v%s.fits"%(directory, beamMapVersion))
+		print 'Reading Aperture Efficiency version %s from calibration directory tree'%(apertureEfficiencyVersion)
 else:
-	#read RSRF from calibration tree
+	#read RSRF and Aperture Efficiency from calibration tree
 	rsrf=cal.getPhot().getProduct('Rsrf')
 	rsrfVersion=rsrf.getVersion()
+	apertureEfficiency = cal.getPhot().getProduct('ApertureEfficiency')
+	apertureEfficiencyVersion=apertureEfficiency.getVersion()
 	if verbose:
 		print 'Reading RSRF version %s from calibration %s'%(rsrfVersion,cal.getVersion())
+		print 'Reading Aperture Efficiency version %s from calibration %s'%(apertureEfficiencyVersion,cal.getVersion())
 
 # Photometer RSRF
 spireFreq   = rsrf['rsrf']['frequency'].data*1e9  # Frequency in Hz
@@ -294,7 +311,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	Outputs:     (list of objects)
 	  [0]:       (float) Beam area [arcsec^2] at frequency freqx
 	  [1]:       (array float) Monochromatic beam profile at frequency freqx
-
+ColorCorrBeam v%s; 
 	Calculation:
           Scales the core beam profile width as (freqx/effFreq)^gamma.
 	  Queries the calibration file to generate new core beam profile.
@@ -304,7 +321,7 @@ def spireMonoBeam(freqx,beamRad,beamProfs,effFreq,gamma,array):
 	Dependencies:
 	  herschel.ia.numeric.toolbox.interp.LinearInterpolator
 	  herschel.ia.numeric.toolbox.integr.TrapezoidalIntegrator
-	  
+	  ColorCorrBeam v%s; 
 	2013/12/19  C. North  initial version
 	2014/11/04  C. North  removed constant from calculations
 
@@ -424,7 +441,6 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array,
 	  freq:       (array float) frequency vector [Hz] for which monochromatic
 	                beams areas should be calculated
 	  transm:     (array float) relative spectral response (RSRF) corresponding to freq
-	                Note that this should *not* include the aperture efficiency
 	  beamProfs:  (dataset) PhotRadialCorrBeam object from calibration tree
 	  effFreq:    (float) effective frequency [Hz] of array
 	  gamma:      (float) Exponent of powerlaw describing FWHM dependence
@@ -503,7 +519,7 @@ def spireEffBeam(freq, transm, beamProfs, effFreq, gamma, array,
 		numInteg = integrator.integrate(numInterp)
 
 		#write value into table
-		effBeam[r]=numInteg/denomInteg	
+		effBeam[r]=numInteg/denomInteg
 
 	beamInterp = CubicSplineInterpolator(beamRad,effBeam * 2.*Math.PI*beamRad)
 	effBeamAreaInt=TrapezoidalIntegrator(0,maxRad)
@@ -619,7 +635,7 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 #beamRad = beamProfs['core']['radius'].data
 #sizeInterp = CubicSplineInterpolator(Double1d(beamRad),2.*Math.PI*beamRad)
 #integBG = TrapezoidalIntegrator(apPhotBGRad['in'],apPhotBGRad['out'])
-#integTot = TrapezoidalIntegrator(0,max(beamRad))
+#integTot = TrapezoidalIntegrator(0,ColorCorrBeam v%s; max(beamRad))
 #sizeBG = integBG.integrate(sizeInterp)
 #
 #for band in spireBands:
@@ -676,29 +692,6 @@ def spireEffBeamMap(beamRad,effBeam,beamRadMap,verbose=False):
 #===============================================================================
 #-------------------------------------------------------------------------------
 
-#read in example map from file
-#try:
-#	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
-#except:
-#	#download if not available
-#	import urllib
-#	urllib.urlretrieve ("https://nhscsci.ipac.caltech.edu/spire/data/beam_profiles/"+beamMapName,\
-#	    os.path.join(dataDir,beamMapName))
-#	beamIn = fitsReader(file = os.path.join(dataDir,beamMapName))
-
-beamRad = beamProfs['core']['radius'].data
-
-# make map of radius (speeds up processing later)
-print 'Making beam Radius map'
-beamRadMap=SimpleImage()
-beamRadMap['image']=beamMap['image']
-nxMap=beamMap['image'].data[:,0].size
-nyMap=beamMap['image'].data[0,:].size
-bcenter=[int(nxMap/2.),int(nyMap/2.)]
-for x in range(nxMap):
-	for y in range(nyMap):
-		beamRadMap['image'].data[x,y]= \
-			Math.sqrt((x-bcenter[0])**2 + (y-bcenter[1])**2)
 
 # set up product for no background
 # define the start and end dates for the product
@@ -714,7 +707,7 @@ apCorrFullNoBG.meta["creationDate"].value = FineTime(java.util.Date())
 apCorrFullNoBG.meta["startDate"].value = FineTime(startDate)
 apCorrFullNoBG.meta["endDate"].value = FineTime(endDate)
 apCorrFullNoBG.meta["author"]  = metaDict.newParameter("author", "Chris North")
-apCorrFullNoBG.meta["dataOrigin"]  = metaDict.newParameter("dataOrigin","RSRF v%s; BeamProf PSW fine v%s; ColorCorrBeam v%s; RadialCorrBeam v%s"%(rsrfVersion, beamMapVersion, kBeamVersion, beamProfsVersion))
+apCorrFullNoBG.meta["dataOrigin"]  = metaDict.newParameter("dataOrigin","RSRF v%s; ApertureEfficiency v%s; ColorCorrBeam v%s; RadialCorrBeam v%s"%(rsrfVersion, apertureEfficiencyVersion, kBeamVersion, beamProfsVersion))
 apCorrFullNoBG.meta["dependency"].value = "apertureCorrectionType"
 apCorrFullNoBG.meta["apertureCorrectionType"] = StringParameter(value="noBG", description="Aperture correction type (with/without background)")
 apCorrFullNoBG.setVersion(version)
@@ -737,27 +730,53 @@ for band in spireBands:
 	apCorrFullNoBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
 	apCorrFullIncBG['alpha'].addColumn(band,Column(Float1d(len(alphaK))))
 
-#-----------------------------------------------------------------------
-print '\nCalculating aperture corrections corrections over alpha...'
-for band in spireBands:
-	for a in range(len(alphaK)):
-		print '%s alpha=%.1f'%(band,alphaK[a])
-		#calculate beam areas
-		#effBeamPSW contains (beam area, beam profile, beam map)
-		effBeam_x=spireEffBeam(freq,spireFilt[band],beamProfs,spireEffFreq[band],\
-		  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
-		effBeam_x['map']=spireEffBeamMap(beamRad,effBeam_x['profile'],beamRadMap,verbose=True)
-		#perform aperture photometry
-		apPhot_x = annularSkyAperturePhotometry(image=effBeam_x['map'], \
-		  fractional=0, centerX=bcenter[0], centerY=bcenter[1], \
-		  radiusArcsec=apPhotRad[band], \
-		  innerArcsec=apPhotBGRad['in'], outerArcsec=apPhotBGRad['out'])
-		#get result of aperture correction procedure
-		apPhotIncBG_x = apPhot_x.getTargetTotal()
-		apPhotNoBG_x = apPhot_x.getTargetPlusSkyTotal()
-		#compute correction to provide actual beam area
-		apCorrFullIncBG['alpha'][band].data[a]=effBeam_x['area']/apPhotIncBG_x
-		apCorrFullNoBG['alpha'][band].data[a]=effBeam_x['area']/apPhotNoBG_x
+if reCalc:
+	#-----------------------------------------------------------------------
+	beamRad = beamProfs['core']['radius'].data
+	# make map of radius (speeds up processing later)
+	print 'Making beam Radius map'
+	#read mp from caTree
+	beamMap = cal.getPhot().getProduct('BeamProfList').getProduct('PSW','fine')
+	#make new radius map
+	beamRadMap=SimpleImage()
+	beamRadMap['image']=beamMap['image']
+	nxMap=beamMap['image'].data[:,0].size
+	nyMap=beamMap['image'].data[0,:].size
+	bcenter=[int(nxMap/2.),int(nyMap/2.)]
+	for x in range(nxMap):
+		for y in range(nyMap):
+			beamRadMap['image'].data[x,y]= \
+				Math.sqrt((x-bcenter[0])**2 + (y-bcenter[1])**2)
+	#-----------------------------------------------------------------------
+	print '\nCalculating aperture corrections corrections over alpha...'
+	for band in spireBands:
+		for a in range(len(alphaK)):
+			print '%s alpha=%.1f'%(band,alphaK[a])
+			#calculate beam areas
+			#effBeamPSW contains (beam area, beam profile, beam map)
+			effBeam_x=spireEffBeam(freq,spireFilt[band],beamProfs,spireEffFreq[band],\
+			  gamma,band,BB=False,alpha=alphaK[a],verbose=verbose)
+			effBeam_x['map']=spireEffBeamMap(beamRad,effBeam_x['profile'],beamRadMap,verbose=True)
+			#perform aperture photometry
+			apPhot_x = annularSkyAperturePhotometry(image=effBeam_x['map'], \
+			  fractional=0, centerX=bcenter[0], centerY=bcenter[1], \
+			  radiusArcsec=apPhotRad[band], \
+			  innerArcsec=apPhotBGRad['in'], outerArcsec=apPhotBGRad['out'])
+			#get result of aperture correction procedure
+			apPhotIncBG_x = apPhot_x.getTargetTotal()
+			apPhotNoBG_x = apPhot_x.getTargetPlusSkyTotal()
+			#compute correction to provide actual beam area
+			apCorrFullIncBG['alpha'][band].data[a]=effBeam_x['area']/apPhotIncBG_x
+			apCorrFullNoBG['alpha'][band].data[a]=effBeam_x['area']/apPhotNoBG_x
+else:
+	#-----------------------------------------------------------------------
+	print '\nReading aperture corrections (noBG) from %s...'%(fileInNoBG)
+	apCorrInNoBG = asciiTableReader(os.path.join(dataDir,fileInNoBG))
+	print '\nReading aperture corrections (incBG) from %s...'%(fileInIncBG)
+	apCorrInIncBG = asciiTableReader(os.path.join(dataDir,fileInIncBG))
+	for band in spireBands:
+		apCorrFullNoBG['alpha'][band].data = apCorrInNoBG[band].data
+		apCorrFullIncBG['alpha'][band].data = apCorrInIncBG[band].data
 
 # set FITS filenames
 if outputCalDirTree:
