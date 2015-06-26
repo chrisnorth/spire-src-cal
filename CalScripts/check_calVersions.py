@@ -3,13 +3,19 @@
 #output is the min/max of (1 - ver1/ver2) for a range of parameters
 
 #set to also plot some plots
-doPlot=False
+doPlot=True
 
-#set version numbers (type = "file" or "cal")
+directory=Configuration.getProperty('var.hcss.workdir')
+
+#set version numbers (type = "file", "jar" or "cal")
+# cal: read from HSA
+# jar: read from jarFile
+# file: read from calibration directory tree
+
 #ver1={'name':"v4EP",'type':"file"}
-ver1={'name':"spire_cal_12_2",'type':"cal"}
-ver2={'name':"spire_cal_12_3",'type':"cal"}
-#ver2={'name':"v4EP",'type':"file"}
+ver1={'name':"spire_cal_13_1",'type':"cal"}
+#ver2={'name':"spire_cal_12_3",'type':"cal"}
+ver2={'name':"v5",'type':"file"}
 
 #set version numbers for specific files
 verBeamProf=[ver1,ver2]
@@ -18,8 +24,6 @@ verKPsrc=[ver1,ver2]
 verKExtd=[ver1,ver2]
 verApCorr=[ver1,ver2]
 verKHfi=[ver1,ver2]
-
-directory=Configuration.getProperty('var.hcss.workdir')
 
 spireBands=["PSW","PMW","PLW"]
 
@@ -408,7 +412,7 @@ for band in spireBands:
 	pKHFIplw.addLayer(LayerXY(KHfi2i['colorCorr']['Temperature'].data,\
 		1.-KHfi2i['colorCorr']['k545toPLW'].data/KHfi1i['colorCorr']['k545toPLW'].data, \
 		color=cols[band],name='%s'%(band)))
-	pKHFIplw.setTitleText('SPIRE-HFI correction (857 to PMW)')
+	pKHFIplw.setTitleText('SPIRE-HFI correction (545 to PLW)')
 	pKHFIplw.yaxis.titleText = '1-%s/%s'%(verKHfi[1]['name'],verKHfi[0]['name'])
 	pKHFIplw.xaxis.titleText = 'Temperature (K)'
 	pKHFIplw.setSubtitleText('MIN=%.5g MAX=%.5g'%\
