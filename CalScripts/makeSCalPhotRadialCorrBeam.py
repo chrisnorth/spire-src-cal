@@ -82,11 +82,12 @@
 #                                     removed constant beam from calculations where appropriate
 # E. Polehampton   13-11-2014  - Tidy up metadata (use metadata dictionary)
 # Chris North      26-06-2015  - (v1.8) Added aperture efficiency to effective beam calculations
+# Chris North      25-08-2015  - (v1.9) Removed typos
 #===============================================================================
 
 import os
 from herschel.share.unit import *
-scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.8 $"
+scriptVersionString = "makeSCalPhotRadialCorrBeam.py $Revision: 1.9 $"
 metaDict = herschel.spire.ia.util.MetaDataDictionary.getInstance()
 
 #-------------------------------------------------------------------------------
