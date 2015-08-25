@@ -475,7 +475,6 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 	Inputs:
 	  freq:        (array float) frequency vector corresponding to RSRF values [Hz]
 	  rsrf:        (array float) relative spectral response (RSRF) corresponding to freq
-	                 Note that this should *not* include the aperture efficiency
 	  beamProfs:   (dataset) PhotRadialCorrBeam object from calibration tree
 	  effFreqInit: (float) Initial estimate of effective frequency [Hz]
 	  gamma:       (float) Exponent of powerlaw describing FWHM dependence
@@ -560,7 +559,7 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 
 		if simpleBeam:
 			beamMonoNew=spireMonoAreasSimple(freq,effFreqs[1],areaNep,gamma)
-		else:kBeamVersion = "5"
+		else:
 			beamMonoNew=spireMonoAreas(freq,beamProfs,effFreqs[1],gamma,array,freqFact=freqFact)
 		effAreas[1]=spireEffArea(freq,rsrf, beamMonoNew, BB=False, alpha=alphaNep)
 
@@ -571,7 +570,7 @@ def spireFindEffFreq(freq, rsrf, beamProfs, effFreqInit, gamma,
 		if (Math.abs(relAreas[1]) < reqPrec):
 			done=True
 	if ((iter > maxIter) and (done==False)):
-		print "  Warning: maximum iterkBeamVersion = "5"ations [%d] exceeded without conversion [%g]"%(maxIter,reqPrec)
+		print "  Warning: maximum iterations [%d] exceeded without conversion [%g]"%(maxIter,reqPrec)
 
 	if verbose:
 		print '  Final %s effFreq: %.4f'%(array,effFreqs[1]/1.e9)
