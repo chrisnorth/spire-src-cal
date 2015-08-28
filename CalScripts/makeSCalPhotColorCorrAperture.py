@@ -115,8 +115,8 @@ dataDir = Configuration.getProperty('var.hcss.workdir')
 # ***RECOMMENDATION: reCalc = False
 reCalc=False
 if reCalc==False:
-	fileInNoBG = 'ApertureCorrNoBG_BS-Apr2015.csv'
-	fileInIncBG = 'ApertureCorrIncBG_BS-Apr2015.csv'
+	fileInNoBG = 'ApertureCorrNoBG_BS-Aug2015.csv'
+	fileInIncBG = 'ApertureCorrIncBG_BS-Aug2015.csv'
 	apCorrInFileNames = '%s, %s'%(fileInNoBG,fileInIncBG)
 
 # if inputCalDirTree is True, then calibration products are read from a
@@ -127,7 +127,7 @@ if reCalc==False:
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(jarFile='spire_cal_13_0_photTest2.jar')
+	cal=spireCal(jarFile='spire_cal_13_1.jar')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -788,8 +788,8 @@ if outputCalDirTree:
 	apCorrFullNoBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_noBG_v%s.fits"%(directory, version))
 	apCorrFullIncBGFits = java.io.File(r"%s//Phot//SCalPhotColorCorrAperture//SCalPhotColorCorrAperture_incBG_v%s.fits"%(directory, version))
 else:
-	apCorrFullNoBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_Full_noBG_v%s.fits"%(dataDir, version))
-	apCorrFullIncBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_Full_incBG_v%s.fits"%(dataDir, version))
+	apCorrFullNoBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_noBG_v%s.fits"%(dataDir, version))
+	apCorrFullIncBGFits = java.io.File(r"%s//SCalPhotColorCorrAperture_incBG_v%s.fits"%(dataDir, version))
 
 apCorrFullNoBG.meta['fileName'] = herschel.ia.dataset.StringParameter(value=apCorrFullNoBGFits.name,\
   description="Name of file when exported")
