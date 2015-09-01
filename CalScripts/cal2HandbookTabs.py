@@ -175,8 +175,8 @@ verOut.write('Table 6.11. Effective Beam Area ratios (beam correction) as functi
 #Table 6.12. SPIRE FWHM Parameters for 1 arcsec pixels
 drg6_12='tab_6-12_fwhm-parameters.csv'
 tabOut = open(os.path.join(outPath,drg6_12),'w')
-tabOut.write('Band,FWHM,MeanFWHM,Ellipticity\n')
-tabOut.write('(micron),(arcsec),(arcsec),(Ellipticity)\n')
+tabOut.write('Band,FWHM,MeanFWHM,Flattening\n')
+tabOut.write('(micron),(arcsec),(arcsec),(%%)\n')
 for band in spireBands:
     tabOut.write('%d , %.1fx%.1f , %.1f , %.1f\n'%\
     	(wl0_um[band],beamMajor[band],beamMinor[band],beamGMean[band],beamFlat[band]*100))
