@@ -140,7 +140,7 @@ beamCoreIn = TableDataset()
 beamCoreIn.addColumn('radius',Column(Double1d.range(1400),unit=Angle.SECONDS_ARC))
 beamProfInFileNames = ""
 for band in ['PSW','PMW','PLW']:
-    beamProfInFileName = '%s_MCore_9.csv'%band
+    beamProfInFileName = '%s_MCore_10.csv'%band
     beamProfInFileNames+", "+beamProfInFileName
     beamProfIn=asciiTableReader(os.path.join(dataDir, beamProfInFileName))['c0'].data
     #set central pixel to 1
@@ -168,8 +168,8 @@ verbose = True
 arcsec2Sr = (Math.PI/(60.*60.*180))**2
 # area measured on Neptune
 # Taken from Bernhard's presentation at the SDAG on 30 October 2014.
-spireAreaEffFreq = {"PSW":454.0*arcsec2Sr, "PMW":803.4*arcsec2Sr, "PLW":1687.0*arcsec2Sr}
-spireAreaEffFreqErr = {"PSW":1.0*arcsec2Sr, "PMW":4.0*arcsec2Sr, "PLW":12.0*arcsec2Sr}
+spireAreaEffFreq = {"PSW":454.0*arcsec2Sr, "PMW":803.4*arcsec2Sr, "PLW":1700.0*arcsec2Sr}
+spireAreaEffFreqErr = {"PSW":1.2*arcsec2Sr, "PMW":3.8*arcsec2Sr, "PLW":13.0*arcsec2Sr}
 # Neptune spectral index (from ESA4 model)
 alphaNep={"PSW":1.29, "PMW":1.42, "PLW":1.47}
 
