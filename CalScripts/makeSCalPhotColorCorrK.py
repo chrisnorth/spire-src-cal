@@ -571,7 +571,7 @@ beamProfsVersion = "5"
 	numInterp=LinearInterpolator(freq,transm)
 	denomInterp=LinearInterpolator(freq,transm * fSky * area)
 	minFreq=min(freq)
-	maxFreq=max(freq)beamProfsVersion = "5"
+	maxFreq=max(freq)
 
 	integrator=TrapezoidalIntegrator(minFreq,maxFreq)
 	numInteg = integrator.integrate(numInterp)

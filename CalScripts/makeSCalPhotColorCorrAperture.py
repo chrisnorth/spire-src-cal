@@ -113,7 +113,7 @@ dataDir = Configuration.getProperty('var.hcss.workdir')
 #   Bernhard Schulz's IDL code, based on maps with nominal pixel sizes
 # ***Thes produce slightly different results***
 # ***RECOMMENDATION: reCalc = False
-reCalc=False
+reCalc=True
 if reCalc==False:
 	fileInNoBG = 'ApertureCorrNoBG_BS-Aug2015.csv'
 	fileInIncBG = 'ApertureCorrIncBG_BS-Aug2015.csv'
@@ -127,7 +127,7 @@ if reCalc==False:
 inputCalDirTree=True
 if not inputCalDirTree:
 	#read calibration tree from pool
-	cal=spireCal(jarFile='spire_cal_13_1.jar')
+	cal=spireCal('spire_cal_13_1')
 	## alternatively, read from jarFile
 	#cal=spireCal(pool=os.path.join(dataDir,'spire_cal_12_1_test.jar'))
 
@@ -145,7 +145,7 @@ outputCalDirTree=True
 #-------------------------------------------------------------------------------
 
 # Colour correction table version
-version = "5"
+version = "5CN-2"
 
 # Input data version numbers
 rsrfVersion = "3"
@@ -739,6 +739,7 @@ if reCalc:
 	# make map of radius (speeds up processing later)
 	print 'Making beam Radius map'
 	#read mp from caTree
+	cal=spireCal('spire_cal_13_1')
 	beamMap = cal.getPhot().getProduct('BeamProfList').getProduct('PSW','fine')
 	#make new radius map
 	beamRadMap=SimpleImage()
@@ -762,7 +763,7 @@ if reCalc:
 			effBeam_x['map']=spireEffBeamMap(beamRad,effBeam_x['profile'],beamRadMap,verbose=True)
 			#perform aperture photometry
 			apPhot_x = annularSkyAperturePhotometry(image=effBeam_x['map'], \
-			  fractional=0, centerX=bcenter[0], centerY=bcenter[1], \
+			  fractional=1, centerX=bcenter[0], centerY=bcenter[1], \
 			  radiusArcsec=apPhotRad[band], \
 			  innerArcsec=apPhotBGRad['in'], outerArcsec=apPhotBGRad['out'])
 			#get result of aperture correction procedure
