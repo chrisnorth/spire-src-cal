@@ -12,10 +12,11 @@ directory=Configuration.getProperty('var.hcss.workdir')
 # jar: read from jarFile
 # file: read from calibration directory tree
 
-ver1={'name':"v5BS1arcsec",'type':"file"}
+#ver1={'name':"v5",'type':"file"}
 #ver1={'name':"spire_cal_13_1",'type':"cal"}
-#ver2={'name':"spire_cal_12_3",'type':"cal"}
-ver2={'name':"v5BSnominal",'type':"file"}
+ver1={'name':"/home/chris/hcss/workspace/spire_cal_14_0_phot.jar",'type':"jar"}
+#ver2={'name':"/home/chris/hcss/workspace/spire_cal_14_0_phot.jar",'type':"jar"}
+ver2={'name':"v5CN-2",'type':"file"}
 
 #set version numbers for specific files
 verBeamProf=[ver1,ver2]
